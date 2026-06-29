@@ -288,7 +288,7 @@ fun ProcessLimitRemoverScreen(navController: NavController? = null) {
                         enabled = !isExecuting,
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp),
+                            .heightIn(min = 72.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
@@ -325,7 +325,7 @@ fun ProcessLimitRemoverScreen(navController: NavController? = null) {
                         enabled = !isExecuting,
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp),
+                            .heightIn(min = 72.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.secondary
