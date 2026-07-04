@@ -168,6 +168,7 @@ internal object StructuredToolCallBridge {
         var queuedToolCalls = JSONArray()
         val queuedToolCallIds = mutableListOf<String>()
         val openToolCallIds = mutableListOf<String>()
+        var nextToolCallOrdinal = 0
 
         fun appendQueuedAssistantToolText(text: String) {
             if (text.isBlank()) return
@@ -182,12 +183,12 @@ internal object StructuredToolCallBridge {
         fun queueToolCalls(textContent: String, toolCalls: JSONArray) {
             appendQueuedAssistantToolText(textContent)
             for (i in 0 until toolCalls.length()) {
-                val toolCall = toolCalls.optJSONObject(i) ?: continue
+                val sourceToolCall = toolCalls.optJSONObject(i) ?: continue
+                val toolCall = JSONObject(sourceToolCall.toString())
+                val callId = generatedToolCallId(nextToolCallOrdinal++)
+                toolCall.put("id", callId)
                 queuedToolCalls.put(toolCall)
-                val callId = toolCall.optString("id", "").trim()
-                if (callId.isNotEmpty()) {
-                    queuedToolCallIds.add(callId)
-                }
+                queuedToolCallIds.add(callId)
             }
         }
 
@@ -736,6 +737,16 @@ internal object StructuredToolCallBridge {
             }
         }.replace(Regex("_+"), "_").trim('_')
         return if (output.isEmpty()) "call" else output
+    }
+
+    private fun generatedToolCallId(ordinal: Int): String {
+        val raw = "${stableIdHashPart("tool_call:$ordinal")}_$ordinal"
+        val cleaned = raw.filter { it.isLetterOrDigit() }
+        if (cleaned.isEmpty()) return "call00000"
+        if (cleaned.length == 9) return cleaned
+        if (cleaned.length > 9) return cleaned.takeLast(9)
+        val filler = stableIdHashPart(raw)
+        return (cleaned + filler + "000000000").take(9)
     }
 
     private fun stableIdHashPart(raw: String): String {

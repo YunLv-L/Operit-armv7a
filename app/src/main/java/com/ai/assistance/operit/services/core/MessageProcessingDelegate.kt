@@ -945,7 +945,7 @@ class MessageProcessingDelegate(
                 // 获取当前使用的provider和model信息
                 val loadProviderModelStartTime = messageTimingNow()
                 val (provider, modelName) = try {
-                    service.getProviderAndModelForFunction(
+                    service.getDisplayProviderAndModelForFunction(
                         functionType = com.ai.assistance.operit.data.model.FunctionType.CHAT,
                         chatModelConfigIdOverride = chatModelConfigIdOverride,
                         chatModelIndexOverride = chatModelIndexOverride
@@ -1474,7 +1474,7 @@ class MessageProcessingDelegate(
                 }
 
             val (provider, modelName) =
-                service.getProviderAndModelForFunction(
+                service.getDisplayProviderAndModelForFunction(
                     functionType = FunctionType.CHAT,
                     chatModelConfigIdOverride = chatModelConfigIdOverride,
                     chatModelIndexOverride = chatModelIndexOverride,

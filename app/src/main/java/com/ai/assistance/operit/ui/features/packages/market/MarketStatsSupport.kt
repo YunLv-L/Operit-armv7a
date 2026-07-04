@@ -16,7 +16,6 @@ enum class MarketSortOption(
     UPDATED(R.string.market_sort_updated),
     DOWNLOADS(R.string.market_sort_downloads),
     LIKES(R.string.market_sort_likes),
-    FEATURED(R.string.market_sort_featured)
 }
 
 fun MarketSortOption.toRankMetric(): String {
@@ -24,7 +23,6 @@ fun MarketSortOption.toRankMetric(): String {
         MarketSortOption.UPDATED -> "updated"
         MarketSortOption.DOWNLOADS -> "downloads"
         MarketSortOption.LIKES -> "likes"
-        MarketSortOption.FEATURED -> "featured"
     }
 }
 

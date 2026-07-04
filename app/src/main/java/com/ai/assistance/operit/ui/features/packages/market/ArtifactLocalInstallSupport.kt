@@ -30,33 +30,6 @@ data class LocalArtifactInstallState(
     val snapshot: LocalInstalledArtifactSnapshot? = null
 )
 
-enum class MarketLocalInstallStateKind {
-    NOT_INSTALLED,
-    INSTALLED,
-    UPDATE_AVAILABLE,
-    CONFLICT,
-    BLOCKED_CONFLICT
-}
-
-data class MarketLocalInstallState(
-    val entryId: String,
-    val kind: MarketLocalInstallStateKind
-)
-
-fun resolveMarketLocalInstallStates(
-    entries: List<MarketV2Entry>,
-    installedSnapshots: Map<String, LocalInstalledArtifactSnapshot>
-): Map<String, MarketLocalInstallState> {
-    return entries
-        .filter { entry -> entry.type.lowercase() == "script" || entry.type.lowercase() == "package" }
-        .associate { entry ->
-            entry.id to MarketLocalInstallState(
-                entryId = entry.id,
-                kind = resolveMarketLocalInstallState(entry, installedSnapshots)
-            )
-        }
-}
-
 fun artifactRuntimePackageIds(entries: List<MarketV2Entry>): Set<String> {
     return entries
         .filter { entry -> entry.type.lowercase() == "script" || entry.type.lowercase() == "package" }
@@ -65,37 +38,6 @@ fun artifactRuntimePackageIds(entries: List<MarketV2Entry>): Set<String> {
             currentVersion.runtimePackageId.ifBlank { error("Artifact runtime package id not found for version: ${currentVersion.id}") }
         }
         .toSet()
-}
-
-fun resolveMarketLocalInstallState(
-    entry: MarketV2Entry,
-    installedSnapshots: Map<String, LocalInstalledArtifactSnapshot>
-): MarketLocalInstallStateKind {
-    entry.artifact ?: error("Entry is not artifact: ${entry.id}")
-    val currentVersion = entry.latestVersion ?: error("Entry latestVersion is missing: ${entry.id}")
-    val currentAsset =
-        entry.assets.firstOrNull { it.versionId == currentVersion.id }
-            ?: error("Artifact asset not found for version: ${currentVersion.id}")
-    val runtimePackageId = currentVersion.runtimePackageId.ifBlank { error("Artifact runtime package id not found for version: ${currentVersion.id}") }
-    val projectSha256s =
-        entry.assets
-            .filter { asset -> entry.versions.any { version -> version.id == asset.versionId } }
-            .map { it.sha256 }
-
-    return when (
-        resolveLocalArtifactInstallState(
-            installedSnapshots = installedSnapshots,
-            packageName = runtimePackageId,
-            targetSha256 = currentAsset.sha256,
-            projectNodeSha256s = projectSha256s
-        ).kind
-    ) {
-        LocalArtifactInstallStateKind.NOT_INSTALLED -> MarketLocalInstallStateKind.NOT_INSTALLED
-        LocalArtifactInstallStateKind.EXACT_INSTALLED -> MarketLocalInstallStateKind.INSTALLED
-        LocalArtifactInstallStateKind.SAME_PROJECT_VARIANT_INSTALLED -> MarketLocalInstallStateKind.UPDATE_AVAILABLE
-        LocalArtifactInstallStateKind.NAME_CONFLICT -> MarketLocalInstallStateKind.CONFLICT
-        LocalArtifactInstallStateKind.BUILT_IN_CONFLICT -> MarketLocalInstallStateKind.BLOCKED_CONFLICT
-    }
 }
 
 fun PackageManager.getInstalledArtifactSnapshots(

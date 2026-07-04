@@ -13,6 +13,9 @@ import com.ai.assistance.operit.data.mcp.MCPRepository
 import com.ai.assistance.operit.data.skill.SkillRepository
 import com.google.gson.JsonParser
 import com.ai.assistance.operit.util.AppLogger
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MarketEntryInstallController(
     private val context: Context,
@@ -47,11 +50,14 @@ class MarketEntryInstallController(
             throw IllegalStateException(context.getString(R.string.skillmarket_invalid_repo_url))
         }
         onProgress(MarketInstallStage.IMPORTING_REPOSITORY, null)
-        val result = skillRepository.importSkillFromGitHubRepo(repoUrl)
-        Toast.makeText(context, result, Toast.LENGTH_LONG).show()
-        if (result.startsWith(context.getString(R.string.skill_imported), ignoreCase = true)) {
-            trackEntryAssetDownload(entry, onProgress)
+        deleteInstalledMarkerRoot(entry)
+        val result = skillRepository.importSkillFromGitHubRepoDetailed(repoUrl)
+        val installedDir = result.installedDir ?: throw IllegalStateException(result.message)
+        withContext(Dispatchers.IO) {
+            writeMarketInstallMarker(installedDir, entry)
         }
+        Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+        trackEntryAssetDownload(entry, onProgress)
     }
 
     private suspend fun installMcpEntry(
@@ -65,7 +71,12 @@ class MarketEntryInstallController(
         }
 
         if (installConfig.isNotBlank() && !mcpRepository.checkConfigNeedsPhysicalInstallation(installConfig)) {
+            val serverIds = parseMcpServerIds(installConfig)
+            if (serverIds.isEmpty()) {
+                throw IllegalStateException(context.getString(R.string.mcp_local_no_mcp_servers_field))
+            }
             onProgress(MarketInstallStage.IMPORTING_CONFIG, null)
+            deleteInstalledMarkerRoot(entry)
             val count =
                 MCPLocalServer.getInstance(appContext)
                     .mergeConfigFromJson(installConfig)
@@ -79,6 +90,11 @@ class MarketEntryInstallController(
                         )
                     }
             saveMcpConfigEntryMetadata(entry)
+            withContext(Dispatchers.IO) {
+                serverIds.forEach { serverId ->
+                    writeMarketInstallMarker(mcpConfigMarketMarkerRoot(appContext, serverId), entry)
+                }
+            }
             mcpRepository.refreshPluginList()
             Toast.makeText(
                 context,
@@ -90,8 +106,9 @@ class MarketEntryInstallController(
         }
 
         onProgress(MarketInstallStage.IMPORTING_REPOSITORY, null)
+        deleteInstalledMarkerRoot(entry)
         val server = MCPLocalServer.PluginMetadata(
-            id = entry.marketMcpPluginId(),
+            id = entry.id,
             name = entry.title,
             description = entry.description,
             logoUrl = entry.publisher?.avatarUrl ?: entry.publisher?.avatar ?: entry.author?.avatarUrl ?: entry.author?.avatar ?: "",
@@ -106,6 +123,9 @@ class MarketEntryInstallController(
         )
         when (val result = mcpRepository.installMCPServerWithObject(server)) {
             is InstallResult.Success -> {
+                withContext(Dispatchers.IO) {
+                    writeMarketInstallMarker(File(result.pluginPath), entry)
+                }
                 Toast.makeText(context, context.getString(R.string.mcp_market_install_success, entry.title), Toast.LENGTH_SHORT).show()
                 trackEntryAssetDownload(entry, onProgress)
             }
@@ -164,7 +184,20 @@ class MarketEntryInstallController(
             version = defaultVersion,
             onProgress = onProgress
         )
+        withContext(Dispatchers.IO) {
+            writeMarketInstallMarker(artifactMarketMarkerRoot(packageManager, defaultVersion.runtimePackageId), entry)
+        }
         Toast.makeText(context, context.getString(R.string.external_package_imported), Toast.LENGTH_SHORT).show()
+    }
+
+    private suspend fun deleteInstalledMarkerRoot(entry: MarketV2Entry) {
+        withContext(Dispatchers.IO) {
+            findInstalledMarketMarkerRoots(appContext, packageManager, entry.id).forEach { root ->
+                if (root.exists()) {
+                    root.deleteRecursively()
+                }
+            }
+        }
     }
 
     private suspend fun trackEntryAssetDownload(
@@ -192,10 +225,6 @@ fun MarketV2Entry.canInstallFromUnifiedMarket(): Boolean {
         "package" -> artifact != null && assets.firstOrNull()?.id.orEmpty().isNotBlank()
         else -> false
     }
-}
-
-fun MarketV2Entry.marketMcpPluginId(): String {
-    return title.replace("[^a-zA-Z0-9_]".toRegex(), "_")
 }
 
 fun parseMcpServerIds(installConfig: String): Set<String> {

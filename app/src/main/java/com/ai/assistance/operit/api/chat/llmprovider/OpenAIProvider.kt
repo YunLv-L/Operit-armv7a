@@ -716,6 +716,10 @@ open class OpenAIProvider(
         )
     }
 
+    protected open fun generatedToolCallId(ordinal: Int): String {
+        return generatedShortToolCallId("tool_call:$ordinal", ordinal)
+    }
+
     protected fun calculateAndStoreInputTokens(
         providerReadyHistory: List<PromptTurn>,
         toolsJson: String? = null,
@@ -867,6 +871,7 @@ open class OpenAIProvider(
         var queuedToolCalls = JSONArray()
         val queuedToolCallIds = mutableListOf<String>()
         val openToolCallIds = mutableListOf<String>()
+        var nextToolCallOrdinal = 0
 
         fun appendQueuedAssistantToolText(text: String) {
             if (text.isBlank()) return
@@ -881,12 +886,12 @@ open class OpenAIProvider(
         fun queueToolCalls(textContent: String, toolCalls: JSONArray) {
             appendQueuedAssistantToolText(textContent)
             for (i in 0 until toolCalls.length()) {
-                val toolCall = toolCalls.optJSONObject(i) ?: continue
+                val sourceToolCall = toolCalls.optJSONObject(i) ?: continue
+                val toolCall = JSONObject(sourceToolCall.toString())
+                val callId = generatedToolCallId(nextToolCallOrdinal++)
+                toolCall.put("id", callId)
                 queuedToolCalls.put(toolCall)
-                val callId = toolCall.optString("id", "").trim()
-                if (callId.isNotEmpty()) {
-                    queuedToolCallIds.add(callId)
-                }
+                queuedToolCallIds.add(callId)
             }
         }
 
@@ -1271,6 +1276,10 @@ open class OpenAIProvider(
 
         val filler = stableIdHashPart(raw)
         return (cleaned + filler + "000000000").take(9)
+    }
+
+    protected fun generatedShortToolCallId(seed: String, ordinal: Int): String {
+        return sanitizeToolCallId("${stableIdHashPart(seed)}_$ordinal")
     }
 
     private fun stableIdHashPart(raw: String): String {

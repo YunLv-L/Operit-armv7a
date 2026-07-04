@@ -283,6 +283,43 @@ function formatOutgoingAttachments(uploads: WebUploadedAttachment[]) {
   }));
 }
 
+function uniqueUploadFileName(fileName: string, usedFileNames: Set<string>) {
+  if (!usedFileNames.has(fileName)) {
+    return fileName;
+  }
+
+  const dotIndex = fileName.lastIndexOf('.');
+  const hasExtension = dotIndex > 0 && dotIndex < fileName.length - 1;
+  const baseName = hasExtension ? fileName.slice(0, dotIndex) : fileName;
+  const extension = hasExtension ? fileName.slice(dotIndex) : '';
+
+  let index = 2;
+  let candidate = `${baseName}_${index}${extension}`;
+  while (usedFileNames.has(candidate)) {
+    index += 1;
+    candidate = `${baseName}_${index}${extension}`;
+  }
+  return candidate;
+}
+
+function makeUploadsFileNamesUnique(
+  currentUploads: WebUploadedAttachment[],
+  incomingUploads: WebUploadedAttachment[]
+) {
+  const usedFileNames = new Set(currentUploads.map((upload) => upload.file_name));
+  return incomingUploads.map((upload) => {
+    const uniqueFileName = uniqueUploadFileName(upload.file_name, usedFileNames);
+    usedFileNames.add(uniqueFileName);
+    if (uniqueFileName === upload.file_name) {
+      return upload;
+    }
+    return {
+      ...upload,
+      file_name: uniqueFileName
+    };
+  });
+}
+
 function mergeLatestConversationPage(
   existingMessages: WebChatMessage[],
   latestMessages: WebChatMessage[]
@@ -1209,7 +1246,9 @@ export function useChatViewModel(): ChatViewModel {
       for (const file of normalizedFiles) {
         uploaded.push(await uploadAttachment(token, file));
       }
-      setPendingUploads((currentUploads) => currentUploads.concat(uploaded));
+      setPendingUploads((currentUploads) =>
+        currentUploads.concat(makeUploadsFileNamesUnique(currentUploads, uploaded))
+      );
       setAttachmentPanelOpen(false);
     } catch (uploadError: unknown) {
       handleApiFailure(uploadError);

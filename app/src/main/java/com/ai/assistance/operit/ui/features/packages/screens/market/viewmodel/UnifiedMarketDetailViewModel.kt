@@ -19,7 +19,6 @@ import com.ai.assistance.operit.ui.features.packages.market.MarketInstallStateSt
 import com.ai.assistance.operit.ui.features.packages.market.MarketLocalInstallState
 import com.ai.assistance.operit.ui.features.packages.market.MarketInteractionController
 import com.ai.assistance.operit.ui.features.packages.market.MarketInteractionMessages
-import com.ai.assistance.operit.ui.features.packages.market.getInstalledArtifactSnapshots
 import com.ai.assistance.operit.ui.features.packages.market.resolveMarketLocalInstallStates
 import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.Dispatchers
@@ -73,6 +72,7 @@ class UnifiedMarketDetailViewModel(
     val entryComments = marketInteractionController.entryComments
     val isLoadingComments = marketInteractionController.isLoadingComments
     val isPostingComment = marketInteractionController.isPostingComment
+    val isDeletingComment = marketInteractionController.isDeletingComment
     val entryReactions: StateFlow<Map<String, List<MarketV2Reaction>>> = marketInteractionController.entryReactions
     val isLoadingReactions = marketInteractionController.isLoadingReactions
     val isReacting = marketInteractionController.isReacting
@@ -157,15 +157,12 @@ class UnifiedMarketDetailViewModel(
     }
 
     private suspend fun refreshLocalInstallStates(entry: MarketV2Entry) {
-        if (entry.type.lowercase() != "script" && entry.type.lowercase() != "package") {
-            _localInstallStates.value = emptyMap()
-            return
-        }
         _localInstallStates.value =
             withContext(Dispatchers.IO) {
                 resolveMarketLocalInstallStates(
-                    entries = listOf(entry),
-                    installedSnapshots = packageManager.getInstalledArtifactSnapshots()
+                    context = context.applicationContext,
+                    packageManager = packageManager,
+                    entries = listOf(entry)
                 )
             }
     }
@@ -200,6 +197,6 @@ class UnifiedMarketDetailViewModel(
 private fun MarketV2Entry.marketLikeCount(): Int {
     return stats?.likes ?: reactions.sumOf { reaction ->
         val key = reaction.reaction.ifBlank { reaction.content }
-        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.count.coerceAtLeast(1) else 0
+        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.total.coerceAtLeast(1) else 0
     }
 }

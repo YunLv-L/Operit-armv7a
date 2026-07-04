@@ -76,7 +76,11 @@ export function BubbleAiMessageComposable({
             ) : null}
             <div className="bubble-message-header-copy">
               {headerName ? <strong>{headerName}</strong> : null}
-              {headerMeta ? <span>{headerMeta}</span> : null}
+              {headerMeta ? (
+                <span className="bubble-message-provider-meta" title={headerMeta}>
+                  {headerMeta}
+                </span>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -128,7 +132,11 @@ export function BubbleAiMessageComposable({
           />
         ) : null}
         <div className={`bubble-inline-stack ai ${showAvatar ? 'has-avatar' : 'no-avatar'}`}>
-          {compactMeta ? <span className="bubble-compact-meta">{compactMeta}</span> : null}
+          {compactMeta ? (
+            <span className="bubble-compact-meta" title={compactMeta}>
+              {compactMeta}
+            </span>
+          ) : null}
           <BubbleImageBackgroundSurface
             backgroundStyle={backgroundStyle}
             className={bubbleClassName}

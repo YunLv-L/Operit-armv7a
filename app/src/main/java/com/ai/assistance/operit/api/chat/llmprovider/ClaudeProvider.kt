@@ -690,6 +690,19 @@ class ClaudeProvider(
         var queuedToolUses = JSONArray()
         val queuedToolUseIds = mutableListOf<String>()
         val openToolUseIds = mutableListOf<String>()
+        var nextToolUseOrdinal = 0
+
+        fun generatedToolUseId(ordinal: Int): String {
+            val raw = "${stableIdHashPart("tool_use:$ordinal")}_$ordinal"
+            val cleaned = raw.filter { it.isLetterOrDigit() }
+            val suffix = when {
+                cleaned.isEmpty() -> "toolu00000"
+                cleaned.length == 9 -> cleaned
+                cleaned.length > 9 -> cleaned.takeLast(9)
+                else -> (cleaned + stableIdHashPart(raw) + "000000000").take(9)
+            }
+            return "toolu_$suffix"
+        }
 
         fun appendQueuedAssistantToolText(text: String) {
             if (text.isBlank()) return
@@ -704,12 +717,12 @@ class ClaudeProvider(
         fun queueToolUses(textContent: String, toolUses: JSONArray) {
             appendQueuedAssistantToolText(textContent)
             for (i in 0 until toolUses.length()) {
-                val toolUse = toolUses.optJSONObject(i) ?: continue
+                val sourceToolUse = toolUses.optJSONObject(i) ?: continue
+                val toolUse = JSONObject(sourceToolUse.toString())
+                val toolUseId = generatedToolUseId(nextToolUseOrdinal++)
+                toolUse.put("id", toolUseId)
                 queuedToolUses.put(toolUse)
-                val toolUseId = toolUse.optString("id", "").trim()
-                if (toolUseId.isNotEmpty()) {
-                    queuedToolUseIds.add(toolUseId)
-                }
+                queuedToolUseIds.add(toolUseId)
             }
         }
 
@@ -1101,15 +1114,74 @@ class ClaudeProvider(
 
     /**
      * 判断模型是否推荐使用 adaptive thinking 格式。
-     * 仅做启发式匹配，覆盖已知的官方模型名；
-     * 对于中转/代理平台的自定义模型名，将在首次请求失败时由回退逻辑自动修正。
+     * 仅做启发式匹配，覆盖已知官方模型家族和常见中转命名。
      */
     private fun prefersAdaptiveThinking(): Boolean {
-        val name = modelName.trim().lowercase()
-        return name.contains("opus-4-8") ||
-                name.contains("opus-4-7") ||
-                name.contains("opus-4-6") ||
-                name.contains("sonnet-4-6")
+        val name = normalizeClaudeModelName(modelName)
+
+        if (hasClaudeFamilyAtLeast(name, "fable", 5, 0)) return true
+        if (hasClaudeFamilyAtLeast(name, "mythos", 5, 0)) return true
+
+        return hasClaudeFamilyAtLeast(name, "opus", 4, 6) ||
+                hasClaudeFamilyAtLeast(name, "sonnet", 4, 6)
+    }
+
+    private fun normalizeClaudeModelName(value: String): String {
+        return value
+            .trim()
+            .lowercase()
+            .replace(Regex("(?<=[a-z])(?=\\d)|(?<=\\d)(?=[a-z])"), "-")
+            .replace(Regex("[^a-z0-9]+"), "-")
+            .trim('-')
+    }
+
+    private fun hasClaudeFamilyAtLeast(
+        normalizedModelName: String,
+        family: String,
+        minMajor: Int,
+        minMinor: Int
+    ): Boolean {
+        val version = claudeFamilyVersion(normalizedModelName, family) ?: return false
+        val major = version.first
+        val minor = version.second
+        return major > minMajor || major == minMajor && minor >= minMinor
+    }
+
+    private fun claudeFamilyVersion(normalizedModelName: String, family: String): Pair<Int, Int>? {
+        val parts = normalizedModelName.split('-').filter { it.isNotEmpty() }
+        val familyIndex = parts.indexOf(family)
+        if (familyIndex == -1) return null
+
+        val beforeFamily = parts.take(familyIndex)
+            .takeLastWhileDigitParts()
+            .takeLast(2)
+        val beforeFamilyVersion = numericVersion(beforeFamily)
+        if (beforeFamilyVersion != null) return beforeFamilyVersion
+
+        val afterFamily = parts.drop(familyIndex + 1)
+            .takeWhileDigitParts()
+            .take(2)
+        return numericVersion(afterFamily)
+    }
+
+    private fun List<String>.takeLastWhileDigitParts(): List<String> {
+        return asReversed()
+            .takeWhile { it.isVersionPart() }
+            .asReversed()
+    }
+
+    private fun List<String>.takeWhileDigitParts(): List<String> {
+        return takeWhile { it.isVersionPart() }
+    }
+
+    private fun String.isVersionPart(): Boolean {
+        return all(Char::isDigit) && length < 8
+    }
+
+    private fun numericVersion(parts: List<String>): Pair<Int, Int>? {
+        val major = parts.firstOrNull()?.toIntOrNull() ?: return null
+        val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        return major to minor
     }
 
     /**

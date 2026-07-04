@@ -603,6 +603,24 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
     }
 
+    suspend fun getDisplayProviderAndModelForFunction(
+        functionType: FunctionType,
+        chatModelConfigIdOverride: String?,
+        chatModelIndexOverride: Int?
+    ): Pair<String, String> {
+        val (provider, modelName) = getProviderAndModelForFunction(
+            functionType = functionType,
+            chatModelConfigIdOverride = chatModelConfigIdOverride,
+            chatModelIndexOverride = chatModelIndexOverride
+        )
+        val config = getModelConfigForFunction(
+            functionType = functionType,
+            chatModelConfigIdOverride = chatModelConfigIdOverride,
+            chatModelIndexOverride = chatModelIndexOverride
+        )
+        return Pair("$provider/${config.name}", modelName)
+    }
+
     suspend fun getModelConfigForFunction(
         functionType: FunctionType,
         chatModelConfigIdOverride: String? = null,

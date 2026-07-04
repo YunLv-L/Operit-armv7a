@@ -697,6 +697,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         executorKey: String
     ): HiddenExecResult {
         ensureRipgrepAvailable(toolName)
+        ToolProgressBus.update(toolName, 0.1f, "Running ripgrep...")
         return requireHiddenCommandSuccess(
             action = "Failed to capture ripgrep output",
             result =
@@ -981,7 +982,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 )
             }
 
-            ToolProgressBus.update(toolName, 0.05f, "Running ripgrep...")
+            ToolProgressBus.update(toolName, 0.05f, "Preparing ripgrep...")
             val command =
                 buildRipgrepCodeCommand(
                     path = path,

@@ -3896,7 +3896,8 @@ Kini anda boleh menggunakan mod AutoGLM di antara muka perbualan.</string>
     <string name="supported_app_versions_colon">Versi minimum: %1$s, versi maksimum: %2$s</string>
     <string name="min_supported_app_version">Versi perisian minimum yang disokong</string>
     <string name="max_supported_app_version">Versi perisian maksimum yang disokong</string>
-    <string name="supported_version_input_hint">Sila masukkan nombor versi seperti `1.10.0`, boleh dibiarkan kosong</string>
+    <string name="min_supported_version_input_hint">Wajib. Masukkan versi seperti `1.10.0` atau `1.10.0+5`</string>
+    <string name="max_supported_version_input_hint">Pilihan. Masukkan versi seperti `1.10.0` atau `1.10.0+5`</string>
     <string name="publish_failed_title">Gagal diterbitkan</string>
     <string name="retry_market_registration">Cuba semula pendaftaran pasaran</string>
     <string name="update_to_market">Kemas kini ke pasaran</string>

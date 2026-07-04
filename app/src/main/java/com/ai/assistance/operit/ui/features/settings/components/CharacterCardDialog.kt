@@ -1081,6 +1081,7 @@ private fun CharacterCardToolAccessDialog(
 
     var selectedTabIndex by remember(visible) { mutableStateOf(0) }
     var localConfig by remember(visible, config) { mutableStateOf(config.normalized()) }
+    var searchQuery by remember(visible) { mutableStateOf("") }
     val tabTitles = listOf(
         stringResource(R.string.character_card_tool_access_tab_builtin),
         stringResource(R.string.character_card_tool_access_tab_package),
@@ -1104,6 +1105,18 @@ private fun CharacterCardToolAccessDialog(
         1 -> stringResource(R.string.character_card_tool_access_empty_packages)
         2 -> stringResource(R.string.character_card_tool_access_empty_skills)
         else -> stringResource(R.string.character_card_tool_access_empty_mcp)
+    }
+    val searchText = searchQuery.trim()
+    val filteredOptions = remember(currentOptions, searchText) {
+        if (searchText.isEmpty()) {
+            currentOptions
+        } else {
+            currentOptions.filter { option ->
+                option.key.contains(searchText, ignoreCase = true) ||
+                    option.title.contains(searchText, ignoreCase = true) ||
+                    option.subtitle.contains(searchText, ignoreCase = true)
+            }
+        }
     }
 
     Dialog(
@@ -1141,13 +1154,51 @@ private fun CharacterCardToolAccessDialog(
                     tabTitles.forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTabIndex == index,
-                            onClick = { selectedTabIndex = index },
+                            onClick = {
+                                selectedTabIndex = index
+                                searchQuery = ""
+                            },
                             text = { Text(title, fontSize = 12.sp) }
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
+
+                if (currentOptions.isNotEmpty()) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.clear)
+                                    )
+                                }
+                            }
+                        },
+                        placeholder = {
+                            Text(
+                                text = stringResource(R.string.character_card_tool_access_search_placeholder),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 Column(
                     modifier = Modifier
@@ -1165,8 +1216,18 @@ private fun CharacterCardToolAccessDialog(
                                 .padding(vertical = 24.dp),
                             textAlign = TextAlign.Center
                         )
+                    } else if (filteredOptions.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.character_card_tool_access_empty_search),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            textAlign = TextAlign.Center
+                        )
                     } else {
-                        currentOptions.forEachIndexed { index, option ->
+                        filteredOptions.forEachIndexed { index, option ->
                             val isSelected = selectedValues.contains(option.key)
                             Row(
                                 modifier = Modifier
@@ -1227,7 +1288,7 @@ private fun CharacterCardToolAccessDialog(
                                 )
                             }
 
-                            if (index < currentOptions.lastIndex) {
+                            if (index < filteredOptions.lastIndex) {
                                 HorizontalDivider(
                                     thickness = 0.5.dp,
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)

@@ -6476,7 +6476,8 @@ Agora é possível usar o modo AutoGLM na interface de diálogo.</string>
     <string name="supported_app_versions_colon">Versão mínima: %1$s, versão máxima: %2$s</string>
     <string name="min_supported_app_version">Versão mínima do software suportada</string>
     <string name="max_supported_app_version">Versão máxima do software suportada</string>
-    <string name="supported_version_input_hint">Digite um número de versão como `1.10.0`, pode deixar em branco</string>
+    <string name="min_supported_version_input_hint">Obrigatório. Digite uma versão como `1.10.0` ou `1.10.0+5`</string>
+    <string name="max_supported_version_input_hint">Opcional. Digite uma versão como `1.10.0` ou `1.10.0+5`</string>
     <string name="publish_failed_title">Falha na publicação</string>
     <string name="retry_market_registration">Tentar novamente o registro no mercado</string>
     <string name="update_to_market">Atualizar no mercado</string>

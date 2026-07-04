@@ -255,24 +255,33 @@ class SkillManager private constructor(private val context: Context) {
         return importSkillFromZip(zipFile, null)
     }
 
+    data class SkillImportResult(
+        val message: String,
+        val installedDir: File?
+    )
+
     fun importSkillFromZip(zipFile: File, subDirPathInZip: String?): String {
+        return importSkillFromZipDetailed(zipFile, subDirPathInZip).message
+    }
+
+    fun importSkillFromZipDetailed(zipFile: File, subDirPathInZip: String?): SkillImportResult {
         if (!zipFile.exists() || !zipFile.canRead()) {
-            return context.getString(R.string.skill_error_cannot_read_file, zipFile.absolutePath)
+            return SkillImportResult(context.getString(R.string.skill_error_cannot_read_file, zipFile.absolutePath), null)
         }
         if (!zipFile.name.endsWith(".zip", ignoreCase = true)) {
-            return context.getString(R.string.skill_error_only_support_zip)
+            return SkillImportResult(context.getString(R.string.skill_error_only_support_zip), null)
         }
 
         val skillsRoot = try {
             getSkillsRootDir()
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error getting skills directory", e)
-            return context.getString(R.string.skill_error_cannot_access_dir, e.message ?: "")
+            return SkillImportResult(context.getString(R.string.skill_error_cannot_access_dir, e.message ?: ""), null)
         }
 
         val tmpDir = File(skillsRoot, ".import_tmp_${System.currentTimeMillis()}")
         if (!tmpDir.mkdirs()) {
-            return context.getString(R.string.skill_error_create_tmp_dir_failed, tmpDir.absolutePath)
+            return SkillImportResult(context.getString(R.string.skill_error_create_tmp_dir_failed, tmpDir.absolutePath), null)
         }
 
         fun cleanupTmp() {
@@ -305,11 +314,11 @@ class SkillManager private constructor(private val context: Context) {
                 val resolvedCanonical = resolved.canonicalFile
                 if (!resolvedCanonical.path.startsWith(baseCanonical.path + File.separator)) {
                     cleanupTmp()
-                    return context.getString(R.string.skill_error_import_invalid_path)
+                    return SkillImportResult(context.getString(R.string.skill_error_import_invalid_path), null)
                 }
                 if (!resolvedCanonical.exists()) {
                     cleanupTmp()
-                    return context.getString(R.string.skill_error_import_path_not_found, normalizedSubDir)
+                    return SkillImportResult(context.getString(R.string.skill_error_import_path_not_found, normalizedSubDir), null)
                 }
                 resolvedCanonical
             }
@@ -333,17 +342,17 @@ class SkillManager private constructor(private val context: Context) {
 
             if (skillMdCandidates.isEmpty()) {
                 cleanupTmp()
-                return if (normalizedSubDir == null) {
+                return SkillImportResult(if (normalizedSubDir == null) {
                     context.getString(R.string.skill_error_import_no_skill_md)
                 } else {
                     context.getString(R.string.skill_error_import_no_skill_md_in_path)
-                }
+                }, null)
             }
 
             val selectedSkillFile = skillMdCandidates.first()
             val selectedSkillDir = selectedSkillFile.parentFile ?: run {
                 cleanupTmp()
-                return context.getString(R.string.skill_error_import_skill_md_path_invalid)
+                return SkillImportResult(context.getString(R.string.skill_error_import_skill_md_path_invalid), null)
             }
 
             val (metaName, metaDesc) = parseSkillMetadata(selectedSkillFile)
@@ -363,7 +372,7 @@ class SkillManager private constructor(private val context: Context) {
 
             if (finalDir.exists()) {
                 cleanupTmp()
-                return context.getString(R.string.skill_error_import_duplicate_name, finalDir.name)
+                return SkillImportResult(context.getString(R.string.skill_error_import_duplicate_name, finalDir.name), null)
             }
 
             // Copy the detected skill directory to final location
@@ -374,15 +383,15 @@ class SkillManager private constructor(private val context: Context) {
             refreshAvailableSkills()
 
             val desc = metaDesc.ifBlank { "" }
-            return if (desc.isNotBlank()) {
+            return SkillImportResult(if (desc.isNotBlank()) {
                 context.getString(R.string.skill_imported_with_desc, finalDir.name, desc)
             } else {
                 context.getString(R.string.skill_imported, finalDir.name)
-            }
+            }, finalDir)
         } catch (e: Exception) {
             AppLogger.e(TAG, "Failed to import skill from zip", e)
             cleanupTmp()
-            return context.getString(R.string.skill_error_import_failed, e.message ?: "")
+            return SkillImportResult(context.getString(R.string.skill_error_import_failed, e.message ?: ""), null)
         }
     }
 

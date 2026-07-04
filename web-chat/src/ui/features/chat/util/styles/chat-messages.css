@@ -534,10 +534,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
   margin-bottom: 8px;
 }
 
 .cursor-message-label {
+  flex: 0 0 auto;
   font-size: 12px;
   font-weight: 600;
   color: var(--chat-text-muted);
@@ -549,7 +551,12 @@
 }
 
 .cursor-message-detail {
-  font-size: 12px;
+  min-width: 0;
+  max-width: min(62vw, 420px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
   color: var(--chat-text-soft);
   text-align: right;
 }
@@ -989,6 +996,14 @@
   color: var(--chat-text-soft);
 }
 
+.bubble-compact-meta {
+  max-width: min(72vw, 420px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
 .bubble-user-label {
   text-align: right;
 }
@@ -1062,6 +1077,8 @@
 }
 
 .bubble-message-header-copy {
+  min-width: 0;
+  max-width: 100%;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
@@ -1078,7 +1095,11 @@
 }
 
 .bubble-message-header-copy span {
-  font-size: 12px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
   color: var(--chat-text-soft);
 }
 

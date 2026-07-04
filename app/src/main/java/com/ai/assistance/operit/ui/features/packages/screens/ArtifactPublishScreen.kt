@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,8 +51,10 @@ import com.ai.assistance.operit.data.api.MarketStatsApiService
 import com.ai.assistance.operit.data.api.MarketV2ManifestCategory
 import com.ai.assistance.operit.ui.features.packages.market.ArtifactMarketScope
 import com.ai.assistance.operit.ui.features.packages.market.ArtifactPublishClusterContext
+import com.ai.assistance.operit.ui.features.packages.market.GitHubForgePublishService
 import com.ai.assistance.operit.ui.features.packages.market.PublishArtifactType
 import com.ai.assistance.operit.ui.features.packages.market.PublishProgressStage
+import com.ai.assistance.operit.ui.features.packages.market.isOperit2VersionAllowed
 import com.ai.assistance.operit.ui.features.packages.market.sameArtifactRuntimePackageId
 import com.ai.assistance.operit.ui.features.packages.screens.artifact.viewmodel.ArtifactMarketViewModel
 import kotlinx.coroutines.launch
@@ -62,6 +65,7 @@ private data class ArtifactPublishEditInfo(
     val description: String,
     val detail: String,
     val categoryId: String,
+    val allowPublicUpdates: Boolean,
     val version: String,
     val minSupportedAppVersion: String?,
     val maxSupportedAppVersion: String?,
@@ -80,9 +84,10 @@ private fun com.ai.assistance.operit.data.api.MarketV2Entry.toArtifactPublishEdi
         description = description,
         detail = detail,
         categoryId = categoryId,
+        allowPublicUpdates = allowPublicUpdates,
         version = versionValue?.version.orEmpty(),
-        minSupportedAppVersion = versionValue?.minAppVersion,
-        maxSupportedAppVersion = versionValue?.maxAppVersion,
+        minSupportedAppVersion = versionValue?.minAppVer,
+        maxSupportedAppVersion = versionValue?.maxAppVer,
         runtimePackageId = versionValue?.runtimePackageId.orEmpty(),
         normalizedId = id,
         sourceFileName = assetValue?.assetName.orEmpty().ifBlank { assetValue?.name.orEmpty() }
@@ -124,7 +129,6 @@ fun ArtifactPublishScreen(
     val publishError by viewModel.publishErrorMessage.collectAsState()
     val publishSuccess by viewModel.publishSuccessMessage.collectAsState()
     val requiresForgeInitialization by viewModel.requiresForgeInitialization.collectAsState()
-    val registrationRetryAvailable by viewModel.registrationRetryAvailable.collectAsState()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
 
     val initialInfo = remember(editingEntry) { editingEntry?.toArtifactPublishEditInfo() }
@@ -171,6 +175,9 @@ fun ArtifactPublishScreen(
     var categoryId by rememberSaveable(activePublishContext?.categoryId) {
         mutableStateOf(initialInfo?.categoryId.orEmpty().ifBlank { activePublishContext?.categoryId.orEmpty() })
     }
+    var allowPublicUpdates by rememberSaveable(initialInfo?.allowPublicUpdates) {
+        mutableStateOf(initialInfo?.allowPublicUpdates ?: true)
+    }
     var version by rememberSaveable { mutableStateOf(initialInfo?.version.orEmpty().ifBlank { "1.0.0" }) }
     var minSupportedAppVersion by rememberSaveable { mutableStateOf(initialInfo?.minSupportedAppVersion.orEmpty()) }
     var maxSupportedAppVersion by rememberSaveable { mutableStateOf(initialInfo?.maxSupportedAppVersion.orEmpty()) }
@@ -179,6 +186,7 @@ fun ArtifactPublishScreen(
     var categoryExpanded by remember { mutableStateOf(false) }
     var categories by remember { mutableStateOf<List<MarketV2ManifestCategory>>(emptyList()) }
     var showConfirmationDialog by remember { mutableStateOf(false) }
+    var showOperit2WarningDialog by remember { mutableStateOf(false) }
     var showSecondForgeConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -436,6 +444,7 @@ fun ArtifactPublishScreen(
                                 }
                             },
                             onClick = {
+                                viewModel.clearPendingMarketRegistrationRetry()
                                 selectedPackageName = artifact.packageName
                                 selectorExpanded = false
                                 if (initialInfo == null) {
@@ -455,6 +464,7 @@ fun ArtifactPublishScreen(
             value = displayName,
             onValueChange = {
                 if (!isEditMode && !isDisplayNameLocked) {
+                    viewModel.clearPendingMarketRegistrationRetry()
                     displayName = it
                 }
             },
@@ -473,32 +483,28 @@ fun ArtifactPublishScreen(
         OutlinedTextField(
             value = description,
             onValueChange = {
-                if (!isContinuationMode) {
-                    description = it
-                }
+                viewModel.clearPendingMarketRegistrationRetry()
+                description = it
             },
             label = { Text(stringResource(R.string.description_label)) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
-            readOnly = isContinuationMode
         )
         OutlinedTextField(
             value = detail,
             onValueChange = {
-                if (!isContinuationMode) {
-                    detail = it
-                }
+                viewModel.clearPendingMarketRegistrationRetry()
+                detail = it
             },
             label = { Text(stringResource(R.string.market_detail_section_details)) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 4,
-            maxLines = 10,
-            readOnly = isContinuationMode
+            maxLines = 10
         )
         ExposedDropdownMenuBox(
             expanded = categoryExpanded,
             onExpandedChange = {
-                if (!isContinuationMode && categories.isNotEmpty()) {
+                if (categories.isNotEmpty()) {
                     categoryExpanded = !categoryExpanded
                 }
             }
@@ -506,7 +512,7 @@ fun ArtifactPublishScreen(
             val selectedCategoryLabel =
                 categoryId
                     .takeIf { it.isNotBlank() }
-                    ?.let { selected -> categories.firstOrNull { it.id == selected }?.name?.ifBlank { selected } ?: selected }
+                    ?.let { selected -> marketCategoryLabel(selected) }
                     .orEmpty()
             OutlinedTextField(
                 value = selectedCategoryLabel,
@@ -516,7 +522,7 @@ fun ArtifactPublishScreen(
                     .fillMaxWidth()
                     .menuAnchor(),
                 readOnly = true,
-                enabled = !isContinuationMode && categories.isNotEmpty(),
+                enabled = categories.isNotEmpty(),
                 trailingIcon = {
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
                 },
@@ -528,10 +534,42 @@ fun ArtifactPublishScreen(
             ) {
                 categories.forEach { category ->
                     DropdownMenuItem(
-                        text = { Text(category.name.ifBlank { category.id }) },
+                        text = { Text(marketCategoryLabel(category.id)) },
                         onClick = {
+                            viewModel.clearPendingMarketRegistrationRetry()
                             categoryId = category.id
                             categoryExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+        if (!isContinuationMode) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = stringResource(R.string.market_allow_public_updates_title),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = stringResource(R.string.market_allow_public_updates_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = allowPublicUpdates,
+                        onCheckedChange = {
+                            viewModel.clearPendingMarketRegistrationRetry()
+                            allowPublicUpdates = it
                         }
                     )
                 }
@@ -541,6 +579,7 @@ fun ArtifactPublishScreen(
             value = version,
             onValueChange = {
                 if (!isEditMode) {
+                    viewModel.clearPendingMarketRegistrationRetry()
                     version = it
                 }
             },
@@ -556,19 +595,25 @@ fun ArtifactPublishScreen(
         )
         OutlinedTextField(
             value = minSupportedAppVersion,
-            onValueChange = { minSupportedAppVersion = it },
+            onValueChange = {
+                viewModel.clearPendingMarketRegistrationRetry()
+                minSupportedAppVersion = it
+            },
             label = { Text(stringResource(R.string.min_supported_app_version)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            supportingText = { Text(stringResource(R.string.supported_version_input_hint)) }
+            supportingText = { Text(stringResource(R.string.min_supported_version_input_hint)) }
         )
         OutlinedTextField(
             value = maxSupportedAppVersion,
-            onValueChange = { maxSupportedAppVersion = it },
+            onValueChange = {
+                viewModel.clearPendingMarketRegistrationRetry()
+                maxSupportedAppVersion = it
+            },
             label = { Text(stringResource(R.string.max_supported_app_version)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            supportingText = { Text(stringResource(R.string.supported_version_input_hint)) }
+            supportingText = { Text(stringResource(R.string.max_supported_version_input_hint)) }
         )
 
         publishError?.let { error ->
@@ -603,17 +648,18 @@ fun ArtifactPublishScreen(
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (registrationRetryAvailable) {
-                        OutlinedButton(onClick = viewModel::retryPendingMarketRegistration) {
-                            Text(stringResource(R.string.retry_market_registration))
-                        }
-                    }
                 }
             }
         }
 
         Button(
-            onClick = { showConfirmationDialog = true },
+            onClick = {
+                if (isOperit2VersionAllowed(maxSupportedAppVersion)) {
+                    showOperit2WarningDialog = true
+                } else {
+                    showConfirmationDialog = true
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             enabled =
                 isLoggedIn &&
@@ -692,7 +738,7 @@ fun ArtifactPublishScreen(
                             stringResource(
                                 R.string.supported_app_versions_colon,
                                 minSupportedAppVersion.ifBlank { "-" },
-                                maxSupportedAppVersion.ifBlank { "-" }
+                                maxSupportedAppVersion.ifBlank { GitHubForgePublishService.DEFAULT_MAX_SUPPORTED_APP_VERSION }
                             )
                         )
                     } else {
@@ -723,7 +769,7 @@ fun ArtifactPublishScreen(
                             stringResource(
                                 R.string.supported_app_versions_colon,
                                 minSupportedAppVersion.ifBlank { "-" },
-                                maxSupportedAppVersion.ifBlank { "-" }
+                                maxSupportedAppVersion.ifBlank { GitHubForgePublishService.DEFAULT_MAX_SUPPORTED_APP_VERSION }
                             )
                         )
                     }
@@ -740,8 +786,9 @@ fun ArtifactPublishScreen(
                                 description = description,
                                 detail = detail,
                                 categoryId = categoryId,
+                                allowPublicUpdates = allowPublicUpdates,
                                 minSupportedAppVersion = minSupportedAppVersion.ifBlank { null },
-                                maxSupportedAppVersion = maxSupportedAppVersion.ifBlank { null }
+                                maxSupportedAppVersion = maxSupportedAppVersion.ifBlank { GitHubForgePublishService.DEFAULT_MAX_SUPPORTED_APP_VERSION }
                             )
                         } else {
                             viewModel.requestPublish(
@@ -750,9 +797,10 @@ fun ArtifactPublishScreen(
                                 description = description,
                                 detail = detail,
                                 categoryId = categoryId,
+                                allowPublicUpdates = allowPublicUpdates,
                                 version = version,
                                 minSupportedAppVersion = minSupportedAppVersion.ifBlank { null },
-                                maxSupportedAppVersion = maxSupportedAppVersion.ifBlank { null },
+                                maxSupportedAppVersion = maxSupportedAppVersion.ifBlank { GitHubForgePublishService.DEFAULT_MAX_SUPPORTED_APP_VERSION },
                                 publishContext = activePublishContext
                             )
                         }
@@ -769,6 +817,29 @@ fun ArtifactPublishScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showConfirmationDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showOperit2WarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showOperit2WarningDialog = false },
+            title = { Text(stringResource(R.string.operit2_version_warning_title)) },
+            text = { Text(stringResource(R.string.operit2_version_warning_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOperit2WarningDialog = false
+                        showConfirmationDialog = true
+                    }
+                ) {
+                    Text(stringResource(R.string.continue_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOperit2WarningDialog = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             }

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -85,10 +88,7 @@ fun RepoMarketPublishScreen(
     var repositoryUrl by remember(initialDraft) { mutableStateOf(initialDraft.repositoryUrl) }
     var installConfig by remember(initialDraft) { mutableStateOf(initialDraft.installConfig) }
     var category by remember(initialDraft) { mutableStateOf(initialDraft.category) }
-    var refType by remember(initialDraft) { mutableStateOf(initialDraft.refType) }
-    var refName by remember(initialDraft) { mutableStateOf(initialDraft.refName) }
-    var manifestPath by remember(initialDraft) { mutableStateOf(initialDraft.manifestPath) }
-    var subdir by remember(initialDraft) { mutableStateOf(initialDraft.subdir) }
+    var allowPublicUpdates by remember(initialDraft) { mutableStateOf(initialDraft.allowPublicUpdates) }
     var version by remember(editingEntry?.id) {
         mutableStateOf(if (isEditMode) "" else "1.0.0")
     }
@@ -100,7 +100,7 @@ fun RepoMarketPublishScreen(
     var categories by remember { mutableStateOf<List<MarketV2ManifestCategory>>(emptyList()) }
 
     if (!isEditMode) {
-        LaunchedEffect(title, description, detail, repositoryUrl, installConfig, category, refType, refName, manifestPath, subdir) {
+        LaunchedEffect(title, description, detail, repositoryUrl, installConfig, category, allowPublicUpdates) {
             viewModel.saveDraft(
                 title = title,
                 description = description,
@@ -108,10 +108,7 @@ fun RepoMarketPublishScreen(
                 repositoryUrl = repositoryUrl,
                 installConfig = installConfig,
                 category = category,
-                refType = refType,
-                refName = refName,
-                manifestPath = manifestPath,
-                subdir = subdir
+                allowPublicUpdates = allowPublicUpdates
             )
         }
     }
@@ -138,45 +135,30 @@ fun RepoMarketPublishScreen(
 
         OutlinedTextField(
             value = title,
-            onValueChange = {
-                if (!isVersionMode) {
-                    title = it
-                }
-            },
+            onValueChange = { title = it },
             label = { Text(repoNameLabel(type)) },
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             singleLine = true,
-            readOnly = isVersionMode,
             isError = title.isBlank()
         )
 
         OutlinedTextField(
             value = description,
-            onValueChange = {
-                if (!isVersionMode) {
-                    description = it
-                }
-            },
+            onValueChange = { description = it },
             label = { Text(repoDescriptionLabel(type)) },
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             minLines = 3,
             maxLines = 6,
-            readOnly = isVersionMode,
             isError = description.isBlank()
         )
 
         OutlinedTextField(
             value = detail,
-            onValueChange = {
-                if (!isVersionMode) {
-                    detail = it
-                }
-            },
+            onValueChange = { detail = it },
             label = { Text(stringResource(R.string.market_detail_section_details)) },
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             minLines = 4,
-            maxLines = 10,
-            readOnly = isVersionMode
+            maxLines = 10
         )
 
         OutlinedTextField(
@@ -191,59 +173,48 @@ fun RepoMarketPublishScreen(
             singleLine = true,
             readOnly = isEditMode,
             placeholder = { Text("https://github.com/username/repo") },
+            supportingText = { Text(stringResource(R.string.repo_publish_repository_url_description)) },
             isError = repositoryUrl.isBlank()
         )
 
         RepoCategoryDropdown(
             selectedCategory = category,
             categories = categories,
-            onCategorySelected = {
-                if (!isVersionMode) {
-                    category = it
-                }
-            },
-            enabled = !isVersionMode,
+            onCategorySelected = { category = it },
+            enabled = true,
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
         )
 
+        if (!isVersionMode) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = stringResource(R.string.market_allow_public_updates_title),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = stringResource(R.string.market_allow_public_updates_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = allowPublicUpdates,
+                        onCheckedChange = { allowPublicUpdates = it }
+                    )
+                }
+            }
+        }
+
         if (!isEditMode || isVersionMode) {
-            OutlinedTextField(
-                value = refType,
-                onValueChange = { refType = it },
-                label = { Text(stringResource(R.string.repo_publish_ref_type)) },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                singleLine = true,
-                placeholder = { Text("branch / tag") },
-                isError = refType.isBlank()
-            )
-
-            OutlinedTextField(
-                value = refName,
-                onValueChange = { refName = it },
-                label = { Text(stringResource(R.string.repo_publish_ref_name)) },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                singleLine = true,
-                placeholder = { Text("main / v1.0.0") },
-                isError = refName.isBlank()
-            )
-
-            OutlinedTextField(
-                value = manifestPath,
-                onValueChange = { manifestPath = it },
-                label = { Text(stringResource(R.string.repo_publish_manifest_path)) },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                singleLine = true,
-                placeholder = { Text(if (type == MarketStatsType.MCP) "mcp.json" else "skill.json") }
-            )
-
-            OutlinedTextField(
-                value = subdir,
-                onValueChange = { subdir = it },
-                label = { Text(stringResource(R.string.repo_publish_subdir)) },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                singleLine = true
-            )
-
             if (type == MarketStatsType.MCP) {
                 OutlinedTextField(
                     value = installConfig,
@@ -300,7 +271,8 @@ fun RepoMarketPublishScreen(
                                 title = title,
                                 description = description,
                                 detail = detail,
-                                category = category
+                                category = category,
+                                allowPublicUpdates = allowPublicUpdates
                             ).fold(
                                 onSuccess = { successAction = RepoPublishSuccessAction.METADATA },
                                 onFailure = { error ->
@@ -319,10 +291,11 @@ fun RepoMarketPublishScreen(
             ) {
                 if (isPublishing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.padding(end = 8.dp),
+                        modifier = Modifier.size(18.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.updating_progress))
                 } else {
                     Text(stringResource(R.string.update_plugin))
@@ -333,21 +306,22 @@ fun RepoMarketPublishScreen(
         if (!isEditMode || isVersionMode) {
             Button(
                 onClick = {
-                    if (title.isBlank() || description.isBlank() || repositoryUrl.isBlank() || version.isBlank() || category.isBlank() || refType.isBlank() || refName.isBlank()) {
+                    if (title.isBlank() || description.isBlank() || repositoryUrl.isBlank() || version.isBlank() || category.isBlank()) {
                         errorMessage = context.getString(R.string.please_fill_all_required_fields)
                         return@Button
                     }
                     showConfirmationDialog = true
                 },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
-                enabled = !isPublishing && title.isNotBlank() && description.isNotBlank() && repositoryUrl.isNotBlank() && version.isNotBlank() && category.isNotBlank() && refType.isNotBlank() && refName.isNotBlank()
+                enabled = !isPublishing && title.isNotBlank() && description.isNotBlank() && repositoryUrl.isNotBlank() && version.isNotBlank() && category.isNotBlank()
             ) {
                 if (isPublishing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.padding(end = 8.dp),
+                        modifier = Modifier.size(18.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(if (isVersionMode) R.string.updating_progress else R.string.publishing_progress))
                 } else {
                     Text(stringResource(if (isVersionMode) R.string.artifact_publish_publish_update_version else R.string.publish_to_market))
@@ -376,10 +350,6 @@ fun RepoMarketPublishScreen(
             repositoryUrl = repositoryUrl,
             category = category,
             version = version,
-            refType = refType,
-            refName = refName,
-            manifestPath = manifestPath,
-            subdir = subdir,
             installConfig = installConfig,
             onDismiss = { showConfirmationDialog = false },
             onConfirm = {
@@ -392,12 +362,13 @@ fun RepoMarketPublishScreen(
                             if (isVersionMode && editingEntry != null) {
                                 viewModel.publishNewVersion(
                                     entry = editingEntry,
+                                    title = title,
+                                    description = description,
+                                    detail = detail,
+                                    category = category,
+                                    allowPublicUpdates = allowPublicUpdates,
                                     version = version,
-                                    installConfig = installConfig,
-                                    refType = refType,
-                                    refName = refName,
-                                    manifestPath = manifestPath,
-                                    subdir = subdir
+                                    installConfig = installConfig
                                 )
                             } else {
                                 viewModel.publish(
@@ -408,10 +379,7 @@ fun RepoMarketPublishScreen(
                                     version = version,
                                     installConfig = installConfig,
                                     category = category,
-                                    refType = refType,
-                                    refName = refName,
-                                    manifestPath = manifestPath,
-                                    subdir = subdir
+                                    allowPublicUpdates = allowPublicUpdates
                                 )
                             }
 
@@ -468,7 +436,7 @@ private fun RepoCategoryDropdown(
     val selectedLabel =
         selectedCategory
             .takeIf { it.isNotBlank() }
-            ?.let { selected -> categories.firstOrNull { it.id == selected }?.name?.ifBlank { selected } ?: selected }
+            ?.let { selected -> marketCategoryLabel(selected) }
             .orEmpty()
 
     Box(modifier = modifier) {
@@ -496,7 +464,7 @@ private fun RepoCategoryDropdown(
         ) {
             categories.forEach { category ->
                 DropdownMenuItem(
-                    text = { Text(category.name.ifBlank { category.id }) },
+                    text = { Text(marketCategoryLabel(category.id)) },
                     onClick = {
                         onCategorySelected(category.id)
                         expanded = false
@@ -564,10 +532,6 @@ private fun RepoPublishConfirmDialog(
     repositoryUrl: String,
     category: String,
     version: String,
-    refType: String,
-    refName: String,
-    manifestPath: String,
-    subdir: String,
     installConfig: String,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
@@ -602,13 +566,6 @@ private fun RepoPublishConfirmDialog(
                 }
                 Text(stringResource(R.string.repository_colon, repositoryUrl), style = MaterialTheme.typography.bodyMedium)
                 Text(stringResource(R.string.version_colon, version), style = MaterialTheme.typography.bodyMedium)
-                Text(stringResource(R.string.repo_publish_ref_colon, refType, refName), style = MaterialTheme.typography.bodyMedium)
-                if (manifestPath.isNotBlank()) {
-                    Text(stringResource(R.string.repo_publish_manifest_path_colon, manifestPath), style = MaterialTheme.typography.bodyMedium)
-                }
-                if (subdir.isNotBlank()) {
-                    Text(stringResource(R.string.repo_publish_subdir_colon, subdir), style = MaterialTheme.typography.bodyMedium)
-                }
                 if (type == MarketStatsType.MCP && installConfig.isNotBlank()) {
                     Text(stringResource(R.string.install_config_colon, installConfig), style = MaterialTheme.typography.bodyMedium)
                 }

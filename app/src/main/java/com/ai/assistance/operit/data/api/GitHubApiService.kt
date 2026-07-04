@@ -42,6 +42,8 @@ data class GitHubRepository(
     val language: String?,
     val topics: List<String> = emptyList(),
     val size: Int = 0,
+    @SerialName("default_branch")
+    val defaultBranch: String = "",
     val created_at: String,
     val updated_at: String,
     val owner: GitHubUser
@@ -725,6 +727,36 @@ class GitHubApiService(private val context: Context) {
 
             if (response.isSuccessful && responseBody != null) {
                 Result.success(json.decodeFromString(GitHubRelease.serializer(), responseBody))
+            } else {
+                Result.failure(buildHttpException(response.code, response.message, responseBody))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteRelease(
+        owner: String,
+        repo: String,
+        releaseId: Long
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val authHeader = authPreferences.getAuthorizationHeader()
+                ?: return@withContext Result.failure(Exception("No access token available"))
+
+            val request =
+                Request.Builder()
+                    .url("$GITHUB_API_BASE/repos/$owner/$repo/releases/$releaseId")
+                    .delete()
+                    .addHeader("Authorization", authHeader)
+                    .addHeader("Accept", "application/vnd.github+json")
+                    .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string()
+
+            if (response.isSuccessful) {
+                Result.success(Unit)
             } else {
                 Result.failure(buildHttpException(response.code, response.message, responseBody))
             }

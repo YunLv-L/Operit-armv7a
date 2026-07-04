@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -49,6 +50,9 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -95,7 +99,9 @@ data class UnifiedMarketDetailParticipant(
     val roleLabel: String,
     val name: String,
     val avatarUrl: String? = null,
-    val fallbackAvatarText: String
+    val fallbackAvatarText: String,
+    val authorId: String? = null,
+    val onClick: ((String, String, String) -> Unit)? = null
 )
 
 data class UnifiedMarketDetailMetric(
@@ -193,9 +199,74 @@ fun UnifiedMarketDetailScreen(
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
+    val pullToRefreshState = rememberPullToRefreshState()
     val tabHeaderIndex = 2
     val shouldPinTitle by remember {
         derivedStateOf { listState.firstVisibleItemIndex >= tabHeaderIndex }
+    }
+    val detailListContent: LazyListScope.() -> Unit = {
+        item {
+            UnifiedMarketDetailHeaderCard(header = header)
+        }
+
+        stickyHeader {
+            UnifiedMarketDetailStickyTabs(
+                selectedTabIndex = selectedTabIndex,
+                commentsTitle = comments.title,
+                onTabSelected = { selectedTabIndex = it }
+            )
+        }
+
+        if (selectedTabIndex == 0) {
+            if (banner != null) {
+                item {
+                    UnifiedMarketDetailBannerCard(banner = banner)
+                }
+            }
+
+            items(sections, key = { it.title }) { section ->
+                UnifiedMarketDetailSectionCard(section = section)
+            }
+
+            if (metadataRows.isNotEmpty()) {
+                item {
+                    UnifiedMarketDetailMetadataCard(
+                        title = metadataTitle,
+                        rows = metadataRows
+                    )
+                }
+            }
+
+            if (overviewExtraContent != null) {
+                item {
+                    overviewExtraContent()
+                }
+            }
+        } else {
+            item {
+                UnifiedMarketDetailCommentsSectionHeader(
+                    state = comments,
+                    reactions = reactions
+                )
+            }
+
+            if (comments.comments.isEmpty() && !comments.isLoading) {
+                item {
+                    UnifiedMarketDetailEmptyCommentsCard()
+                }
+            } else {
+                items(comments.comments, key = { it.id }) { comment ->
+                    UnifiedMarketDetailCommentCard(
+                        comment = comment,
+                        isReply = comment.parentId != null,
+                        onReply = { comments.onReplyToComment(comment) },
+                        onEdit = { comments.onEditComment(comment) },
+                        onDelete = { comments.onDeleteComment(comment) },
+                        currentUserLogin = comments.currentUserLogin
+                    )
+                }
+            }
+        }
     }
 
     BindUnifiedMarketDetailTopBarTitle(
@@ -206,74 +277,36 @@ fun UnifiedMarketDetailScreen(
     Column(
         modifier = modifier.fillMaxSize()
     ) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            item {
-                UnifiedMarketDetailHeaderCard(header = header)
-            }
-
-            stickyHeader {
-                UnifiedMarketDetailStickyTabs(
-                    selectedTabIndex = selectedTabIndex,
-                    commentsTitle = comments.title,
-                    onTabSelected = { selectedTabIndex = it }
-                )
-            }
-
-            if (selectedTabIndex == 0) {
-                if (banner != null) {
-                    item {
-                        UnifiedMarketDetailBannerCard(banner = banner)
-                    }
-                }
-
-                items(sections, key = { it.title }) { section ->
-                    UnifiedMarketDetailSectionCard(section = section)
-                }
-
-                if (metadataRows.isNotEmpty()) {
-                    item {
-                        UnifiedMarketDetailMetadataCard(
-                            title = metadataTitle,
-                            rows = metadataRows
-                        )
-                    }
-                }
-
-                if (overviewExtraContent != null) {
-                    item {
-                        overviewExtraContent()
-                    }
-                }
-            } else {
-                item {
-                    UnifiedMarketDetailCommentsSectionHeader(
-                        state = comments,
-                        reactions = reactions
+        if (selectedTabIndex == 1) {
+            PullToRefreshBox(
+                isRefreshing = comments.isLoading,
+                onRefresh = comments.onRefresh,
+                modifier = Modifier.weight(1f),
+                state = pullToRefreshState,
+                indicator = {
+                    PullToRefreshDefaults.Indicator(
+                        state = pullToRefreshState,
+                        isRefreshing = comments.isLoading,
+                        modifier = Modifier.align(Alignment.TopCenter)
                     )
                 }
-
-                if (comments.comments.isEmpty() && !comments.isLoading) {
-                    item {
-                        UnifiedMarketDetailEmptyCommentsCard()
-                    }
-                } else {
-                    items(comments.comments, key = { it.id }) { comment ->
-                        UnifiedMarketDetailCommentCard(
-                            comment = comment,
-                            isReply = comment.parentId != null,
-                            onReply = { comments.onReplyToComment(comment) },
-                            onEdit = { comments.onEditComment(comment) },
-                            onDelete = { comments.onDeleteComment(comment) },
-                            currentUserLogin = comments.currentUserLogin
-                        )
-                    }
-                }
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    content = detailListContent
+                )
             }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+                content = detailListContent
+            )
         }
 
         Surface(shadowElevation = 6.dp) {
@@ -357,7 +390,8 @@ private fun UnifiedMarketDetailHeaderCard(
                 header.participants.take(2).forEach { participant ->
                     UnifiedMarketDetailParticipantChip(
                         participant = participant,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onClick = participant.onClick
                     )
                 }
             }
@@ -461,10 +495,20 @@ private fun UnifiedMarketDetailLeadingIcon(
 @Composable
 private fun UnifiedMarketDetailParticipantChip(
     participant: UnifiedMarketDetailParticipant,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: ((String, String, String) -> Unit)? = null
 ) {
+    val participantAuthorId = participant.authorId
+    val clickModifier =
+        if (!participantAuthorId.isNullOrBlank() && onClick != null) {
+            Modifier.clickable {
+                onClick(participantAuthorId, participant.name, participant.avatarUrl.orEmpty())
+            }
+        } else {
+            Modifier
+        }
     Row(
-        modifier = modifier,
+        modifier = modifier.then(clickModifier),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

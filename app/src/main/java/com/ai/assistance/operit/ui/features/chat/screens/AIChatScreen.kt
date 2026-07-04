@@ -132,6 +132,7 @@ fun AIChatScreen(
     val context = LocalContext.current
     val density = LocalDensity.current
     val colorScheme = MaterialTheme.colorScheme
+    val isCurrentScreen = LocalIsCurrentScreen.current
 // Correctly initialize ViewModel using the viewModel() composable function
 val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(context.applicationContext) }
 
@@ -434,18 +435,12 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
     )
 
     val pendingChatDraft by PendingChatDraftHandler.pendingDraft.collectAsState()
-    LaunchedEffect(pendingChatDraft) {
+    LaunchedEffect(pendingChatDraft, isCurrentScreen) {
+        if (!isCurrentScreen) return@LaunchedEffect
         val draft = pendingChatDraft?.trim().orEmpty()
         if (draft.isBlank()) return@LaunchedEffect
 
-        actualViewModel.showChatHistorySelector(false)
-        actualViewModel.createNewChat()
-        actualViewModel.updateUserMessage(
-            TextFieldValue(
-                text = draft,
-                selection = TextRange(draft.length)
-            )
-        )
+        actualViewModel.createNewChatWithDraft(draft)
         PendingChatDraftHandler.clearPendingDraft()
     }
 
@@ -828,7 +823,6 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
     // 从CompositionLocal获取设置TopBar Actions的函数
     val setTopBarActions = LocalTopBarActions.current
     val appBarContentColor = LocalAppBarContentColor.current
-    val isCurrentScreen = LocalIsCurrentScreen.current
     val setScreenSoftInputMode = LocalSetScreenSoftInputMode.current
     val setUseScreenImePadding = LocalSetUseScreenImePadding.current
     val requestedSoftInputMode =

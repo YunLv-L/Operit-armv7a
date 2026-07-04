@@ -1113,7 +1113,7 @@ class WebChatHttpBridge(
                     val structuredRenderPreferences = resolveStructuredRenderPreferences()
 
                     core.clearAttachments()
-                    core.getAttachmentDelegate().addAttachments(attachments)
+                    val addedAttachments = core.getAttachmentDelegate().addAttachments(attachments)
                     core.updateUserMessage(messageText)
 
                     val optimisticTimestamp = System.currentTimeMillis()
@@ -1123,7 +1123,7 @@ class WebChatHttpBridge(
                         contentRaw = messageText,
                         timestamp = optimisticTimestamp,
                         displayContent = messageText,
-                        attachments = attachments.map { attachment ->
+                        attachments = addedAttachments.map { attachment ->
                             WebMessageAttachment(
                                 id = attachment.filePath,
                                 fileName = attachment.fileName,

@@ -15,7 +15,6 @@ import com.ai.assistance.operit.ui.features.packages.market.MarketInstallProgres
 import com.ai.assistance.operit.ui.features.packages.market.MarketInstallStateStore
 import com.ai.assistance.operit.ui.features.packages.market.MarketLocalInstallState
 import com.ai.assistance.operit.ui.features.packages.market.MarketSortOption
-import com.ai.assistance.operit.ui.features.packages.market.getInstalledArtifactSnapshots
 import com.ai.assistance.operit.ui.features.packages.market.resolveMarketLocalInstallStates
 import com.ai.assistance.operit.ui.features.packages.market.toRankMetric
 import com.ai.assistance.operit.util.AppLogger
@@ -98,6 +97,9 @@ class UnifiedMarketBrowseViewModel(
     private val _sortOption = MutableStateFlow(MarketSortOption.UPDATED)
     val sortOption: StateFlow<MarketSortOption> = _sortOption.asStateFlow()
 
+    private val _featuredOnly = MutableStateFlow(true)
+    val featuredOnly: StateFlow<Boolean> = _featuredOnly.asStateFlow()
+
     private val _entries = MutableStateFlow<List<MarketV2Entry>>(emptyList())
     private val _categories = MutableStateFlow<List<MarketV2ManifestCategory>>(emptyList())
     val categories: StateFlow<List<MarketV2ManifestCategory>> = _categories.asStateFlow()
@@ -105,13 +107,18 @@ class UnifiedMarketBrowseViewModel(
     private val _notifications = MutableStateFlow<List<MarketV2Notification>>(emptyList())
     val notifications: StateFlow<List<MarketV2Notification>> = _notifications.asStateFlow()
 
+    private val _listScrollIndex = MutableStateFlow(0)
+    val listScrollIndex: StateFlow<Int> = _listScrollIndex.asStateFlow()
+
+    private val _listScrollOffset = MutableStateFlow(0)
+    val listScrollOffset: StateFlow<Int> = _listScrollOffset.asStateFlow()
+
     val entries: StateFlow<List<MarketV2Entry>> =
-        combine(_entries, _searchQuery) { entries, query ->
+        combine(_entries, _searchQuery, _featuredOnly) { entries, query, featuredOnly ->
             val trimmedQuery = query.trim()
-            if (trimmedQuery.isBlank()) {
-                entries
-            } else {
-                entries.filter { entry ->
+            var filtered = entries
+            if (!trimmedQuery.isBlank()) {
+                filtered = filtered.filter { entry ->
                     entry.title.contains(trimmedQuery, ignoreCase = true) ||
                         entry.description.contains(trimmedQuery, ignoreCase = true) ||
                         entry.detail.contains(trimmedQuery, ignoreCase = true) ||
@@ -120,6 +127,10 @@ class UnifiedMarketBrowseViewModel(
                         entry.publisherLogin().contains(trimmedQuery, ignoreCase = true)
                 }
             }
+            if (featuredOnly) {
+                filtered = filtered.filter { it.featured }
+            }
+            filtered
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -128,6 +139,7 @@ class UnifiedMarketBrowseViewModel(
 
     private var currentPage = 1
     private var totalPages = 1
+    private var hasLoadedEntries = false
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
     }
@@ -136,6 +148,11 @@ class UnifiedMarketBrowseViewModel(
         if (_sortOption.value == option) return
         _sortOption.value = option
         loadEntries()
+    }
+
+    fun onFeaturedOnlyChanged(enabled: Boolean) {
+        if (_featuredOnly.value == enabled) return
+        _featuredOnly.value = enabled
     }
 
     fun loadManifest() {
@@ -179,9 +196,20 @@ class UnifiedMarketBrowseViewModel(
                     }
                 )
             } finally {
+                hasLoadedEntries = true
                 _isLoading.value = false
             }
         }
+    }
+
+    fun loadEntriesIfNeeded() {
+        if (hasLoadedEntries || _isLoading.value) return
+        loadEntries()
+    }
+
+    fun updateListScrollPosition(index: Int, offset: Int) {
+        _listScrollIndex.value = index
+        _listScrollOffset.value = offset
     }
 
     fun loadMoreEntries() {
@@ -218,13 +246,18 @@ class UnifiedMarketBrowseViewModel(
 
     fun loadNotifications() {
         viewModelScope.launch {
-            marketApiService.getNotifications(limit = 50, offset = 0).fold(
-                onSuccess = { _notifications.value = it },
-                onFailure = { error ->
-                    _errorMessage.value = error.message ?: "Failed to load market notifications"
-                    AppLogger.e(TAG, "Failed to load market notifications", error)
-                }
-            )
+            _isLoading.value = true
+            try {
+                marketApiService.getNotifications(limit = 50, offset = 0).fold(
+                    onSuccess = { _notifications.value = it },
+                    onFailure = { error ->
+                        _errorMessage.value = error.message ?: "Failed to load market notifications"
+                        AppLogger.e(TAG, "Failed to load market notifications", error)
+                    }
+                )
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
@@ -283,17 +316,16 @@ class UnifiedMarketBrowseViewModel(
         }
 
     private suspend fun refreshLocalInstallStates(entries: List<MarketV2Entry>) {
-        val artifactEntries =
-            entries.filter { entry -> entry.type.lowercase() == "script" || entry.type.lowercase() == "package" }
-        if (artifactEntries.isEmpty()) {
+        if (entries.isEmpty()) {
             _localInstallStates.value = emptyMap()
             return
         }
         _localInstallStates.value =
             withContext(Dispatchers.IO) {
                 resolveMarketLocalInstallStates(
-                    entries = artifactEntries,
-                    installedSnapshots = packageManager.getInstalledArtifactSnapshots()
+                    context = context.applicationContext,
+                    packageManager = packageManager,
+                    entries = entries
                 )
             }
     }
@@ -318,7 +350,6 @@ class UnifiedMarketBrowseViewModel(
     private fun List<MarketV2Entry>.orderedForCurrentSort(): List<MarketV2Entry> {
         return when (_sortOption.value) {
             MarketSortOption.UPDATED -> sortedByDescending { it.updatedTimestamp() }
-            MarketSortOption.FEATURED -> this
             MarketSortOption.DOWNLOADS -> sortedByDescending { it.stats?.downloads ?: it.downloadCount.takeIf { count -> count > 0 } ?: it.downloads }
             MarketSortOption.LIKES -> sortedByDescending { it.likeCount() }
         }
@@ -338,6 +369,6 @@ private fun MarketV2Entry.updatedTimestamp(): String {
 private fun MarketV2Entry.likeCount(): Int {
     return stats?.likes ?: reactions.sumOf { reaction ->
         val key = reaction.reaction.ifBlank { reaction.content }
-        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.count.coerceAtLeast(1) else 0
+        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.total.coerceAtLeast(1) else 0
     }
 }

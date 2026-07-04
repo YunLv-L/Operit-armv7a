@@ -96,6 +96,8 @@ fun <T> MarketBrowseList(
     sortOption: MarketSortOption,
     onSearchQueryChanged: (String) -> Unit,
     onSortOptionChanged: (MarketSortOption) -> Unit,
+    featuredOnly: Boolean = true,
+    onFeaturedOnlyChanged: (Boolean) -> Unit = {},
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     @StringRes searchPlaceholderRes: Int,
@@ -106,9 +108,15 @@ fun <T> MarketBrowseList(
     itemKey: (T) -> Any,
     updatedAtSelector: (T) -> String,
     itemContent: @Composable (T) -> Unit,
+    initialFirstVisibleItemIndex: Int = 0,
+    initialFirstVisibleItemScrollOffset: Int = 0,
+    onScrollPositionChanged: (Int, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialFirstVisibleItemIndex,
+        initialFirstVisibleItemScrollOffset = initialFirstVisibleItemScrollOffset
+    )
     val pullToRefreshState = rememberPullToRefreshState()
     val showInitialLoading = isLoading && items.isEmpty()
     val lastLoadMoreIndex = remember { mutableStateOf(-1) }
@@ -126,12 +134,21 @@ fun <T> MarketBrowseList(
             }
     }
 
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                onScrollPositionChanged(index, offset)
+            }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         MarketBrowseControls(
             searchQuery = searchQuery,
             onSearchQueryChanged = onSearchQueryChanged,
             sortOption = sortOption,
             onSortOptionChanged = onSortOptionChanged,
+            featuredOnly = featuredOnly,
+            onFeaturedOnlyChanged = onFeaturedOnlyChanged,
             searchPlaceholderRes = searchPlaceholderRes,
             sortOptions = sortOptions
         )
@@ -147,7 +164,7 @@ fun <T> MarketBrowseList(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (sortOption == MarketSortOption.UPDATED || sortOption == MarketSortOption.FEATURED) {
+                        if (sortOption == MarketSortOption.UPDATED) {
                             groupedMarketItems(
                                 items = items,
                                 itemKey = itemKey,

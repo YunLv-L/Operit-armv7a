@@ -3937,7 +3937,8 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="supported_app_versions_colon">Versi minimum: %1$s, versi maksimum: %2$s</string>
     <string name="min_supported_app_version">Versi perangkat lunak minimum yang didukung</string>
     <string name="max_supported_app_version">Versi perangkat lunak maksimum yang didukung</string>
-    <string name="supported_version_input_hint">Masukkan nomor versi seperti `1.10.0`, boleh dikosongkan</string>
+    <string name="min_supported_version_input_hint">Wajib. Masukkan versi seperti `1.10.0` atau `1.10.0+5`</string>
+    <string name="max_supported_version_input_hint">Opsional. Masukkan versi seperti `1.10.0` atau `1.10.0+5`</string>
     <string name="publish_failed_title">Gagal menerbitkan</string>
     <string name="retry_market_registration">Coba lagi pendaftaran pasar</string>
     <string name="update_to_market">Perbarui ke pasar</string>

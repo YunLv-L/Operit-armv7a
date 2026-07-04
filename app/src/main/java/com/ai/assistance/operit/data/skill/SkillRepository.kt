@@ -78,9 +78,18 @@ class SkillRepository private constructor(private val context: Context) {
     }
 
     suspend fun importSkillFromGitHubRepo(repoUrl: String): String {
+        return importSkillFromGitHubRepoDetailed(repoUrl).message
+    }
+
+    data class SkillRepoImportResult(
+        val message: String,
+        val installedDir: File?
+    )
+
+    suspend fun importSkillFromGitHubRepoDetailed(repoUrl: String): SkillRepoImportResult {
         return withContext(Dispatchers.IO) {
             val target = parseGitHubSkillTarget(repoUrl)
-                ?: return@withContext context.getString(R.string.skill_invalid_github_url)
+                ?: return@withContext SkillRepoImportResult(context.getString(R.string.skill_invalid_github_url), null)
 
             val owner = target.owner
             val repoName = target.repo
@@ -88,7 +97,7 @@ class SkillRepository private constructor(private val context: Context) {
             val ref = target.ref
                 ?: defaultBranchCache[repoKey]
                 ?: getGithubDefaultBranch(owner, repoName)?.also { defaultBranchCache[repoKey] = it }
-                ?: return@withContext context.getString(R.string.skill_cannot_determine_default_branch, "$owner/$repoName")
+                ?: return@withContext SkillRepoImportResult(context.getString(R.string.skill_cannot_determine_default_branch, "$owner/$repoName"), null)
 
             val encodedRef = encodePathSegment(ref)
             val zipUrl = "https://codeload.github.com/$owner/$repoName/zip/$encodedRef"
@@ -106,47 +115,28 @@ class SkillRepository private constructor(private val context: Context) {
             }
 
             try {
-                val skillsRootDir = File(getSkillsDirectoryPath())
-                val beforeDirs = skillsRootDir.listFiles()?.filter { it.isDirectory }?.map { it.name }?.toSet() ?: emptySet()
-
                 val zipFile = if (pooledZip != null) {
                     pooledZip
                 } else {
                     val downloaded = downloadFromUrl(zipUrl, fallbackTempFile)
                     if (!downloaded || !fallbackTempFile.exists() || fallbackTempFile.length() <= 0L) {
                         if (fallbackTempFile.exists()) fallbackTempFile.delete()
-                        return@withContext context.getString(R.string.skill_download_zip_failed)
+                        return@withContext SkillRepoImportResult(context.getString(R.string.skill_download_zip_failed), null)
                     }
                     fallbackTempFile
                 }
 
-                val result = skillManager.importSkillFromZip(zipFile, target.subDir)
+                val result = skillManager.importSkillFromZipDetailed(zipFile, target.subDir)
 
                 if (pooledZip == null) {
                     runCatching { fallbackTempFile.delete() }
                 }
 
-                // Write repoUrl marker for reliable installed-state detection.
-                if (result.startsWith(context.getString(R.string.skill_imported))) {
-                    val afterDirs = skillsRootDir.listFiles()?.filter { it.isDirectory }?.map { it.name }?.toSet() ?: emptySet()
-                    val newDirs = afterDirs - beforeDirs
-                    val newDirName = newDirs.singleOrNull()
-                    if (!newDirName.isNullOrBlank()) {
-                        try {
-                            File(skillsRootDir, newDirName)
-                                .resolve(".operit_repo_url")
-                                .writeText(repoUrl.trim())
-                        } catch (e: Exception) {
-                            AppLogger.e(TAG, "Failed to write .operit_repo_url marker", e)
-                        }
-                    }
-                }
-
-                result
+                SkillRepoImportResult(result.message, result.installedDir)
             } catch (e: Exception) {
                 AppLogger.e(TAG, "Failed to import skill from GitHub repo", e)
                 if (pooledZip == null && fallbackTempFile.exists()) fallbackTempFile.delete()
-                context.getString(R.string.skill_import_failed, e.message ?: "Unknown error")
+                SkillRepoImportResult(context.getString(R.string.skill_import_failed, e.message ?: "Unknown error"), null)
             }
         }
     }

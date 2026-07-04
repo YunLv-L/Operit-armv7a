@@ -51,6 +51,9 @@ class MarketInteractionController(
     private val _isPostingComment = MutableStateFlow<Set<String>>(emptySet())
     val isPostingComment: StateFlow<Set<String>> = _isPostingComment.asStateFlow()
 
+    private val _isDeletingComment = MutableStateFlow<Set<String>>(emptySet())
+    val isDeletingComment: StateFlow<Set<String>> = _isDeletingComment.asStateFlow()
+
     private val _userAvatarCache = MutableStateFlow<Map<String, String>>(emptyMap())
     val userAvatarCache: StateFlow<Map<String, String>> = _userAvatarCache.asStateFlow()
 
@@ -188,6 +191,7 @@ class MarketInteractionController(
         if (id.isBlank()) return
         scope.launch {
             try {
+                _isDeletingComment.value = _isDeletingComment.value + commentId
                 val result = marketApiService.deleteComment(commentId)
                 result.fold(
                     onSuccess = {
@@ -205,6 +209,8 @@ class MarketInteractionController(
             } catch (e: Exception) {
                 onError("Failed to delete comment: ${e.message}")
                 AppLogger.e(logTag, "Exception while deleting comment $commentId on entry $id", e)
+            } finally {
+                _isDeletingComment.value = _isDeletingComment.value - commentId
             }
         }
     }
@@ -217,7 +223,7 @@ class MarketInteractionController(
             if (entryLikes <= 0) {
                 emptyList()
             } else {
-                listOf(MarketV2Reaction(reaction = "+1", content = "+1", count = entryLikes))
+                listOf(MarketV2Reaction(reaction = "+1", content = "+1", total = entryLikes))
             }
         _entryReactions.value = _entryReactions.value.toMutableMap().also {
             it[id] = reactions
@@ -262,7 +268,7 @@ class MarketInteractionController(
     fun isLoadingReactionsForEntry(entryId: String): Boolean = entryId in _isLoadingReactions.value
     fun isReactingToEntry(entryId: String): Boolean = entryId in _isReacting.value
     fun getLikeCount(entryId: String): Int =
-        getReactionsForEntry(entryId).sumOf { reaction -> if (reaction.reactionKey() == "+1") reaction.count.coerceAtLeast(1) else 0 }
+        getReactionsForEntry(entryId).sumOf { reaction -> if (reaction.reactionKey() == "+1") reaction.total.coerceAtLeast(1) else 0 }
 
     fun fetchUserAvatar(username: String) {
         if (username.isBlank() || _userAvatarCache.value.containsKey(username)) return
@@ -355,6 +361,5 @@ class MarketInteractionController(
 
 
 private fun MarketV2Reaction.reactionKey(): String = reaction.ifBlank { content }
-
 
 

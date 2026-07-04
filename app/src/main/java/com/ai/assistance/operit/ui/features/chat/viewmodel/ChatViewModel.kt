@@ -163,11 +163,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val toolPermissionSystem = ToolPermissionSystem.getInstance(context)
     
     // 终端管理器（用于执行工作区命令）
-    @RequiresApi(Build.VERSION_CODES.O)
-    private val terminal: Terminal? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        Terminal.getInstance(context)
-    } else {
-        null
+    private val terminal: Terminal? by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Terminal.getInstance(context)
+        } else {
+            null
+        }
     }
     
     // 工作区终端会话映射表：workspacePath -> sessionId
@@ -643,6 +644,26 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     // 聊天历史相关方法
     fun createNewChat(characterCardName: String? = null, characterGroupId: String? = null) {
         chatHistoryDelegate.createNewChat(characterCardName = characterCardName, characterGroupId = characterGroupId)
+    }
+
+    fun createNewChatWithDraft(draft: String) {
+        val trimmedDraft = draft.trim()
+        if (trimmedDraft.isBlank()) return
+
+        viewModelScope.launch {
+            showChatHistorySelector(false)
+            val previousChatId = chatHistoryDelegate.currentChatId.value
+            chatHistoryDelegate.createNewChat()
+            chatHistoryDelegate.currentChatId
+                .filter { chatId -> chatId != null && chatId != previousChatId }
+                .first()
+            messageProcessingDelegate.updateUserMessage(
+                TextFieldValue(
+                    text = trimmedDraft,
+                    selection = TextRange(trimmedDraft.length)
+                )
+            )
+        }
     }
 
     fun switchChat(chatId: String) {
@@ -2464,10 +2485,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             return
         }
 
-        if (terminal == null) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             uiStateDelegate.showErrorMessage(context.getString(R.string.chat_terminal_requires_android_8))
             return
         }
+        val terminalInstance = terminal ?: return
 
         if (command.usesDedicatedSession) {
             executeBackgroundWorkspaceCommand(command, workspacePath, commandText)
@@ -2490,10 +2512,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 var sharedSessionId = workspaceTerminalSessions[workspacePath]
 
                 // 如果会话不存在或已关闭，创建新会话
-                if (sharedSessionId == null || terminal.terminalState.value.sessions.none { it.id == sharedSessionId }) {
+                if (sharedSessionId == null || terminalInstance.terminalState.value.sessions.none { it.id == sharedSessionId }) {
                     val workspaceName = workspaceDir.name.take(4) // 只取前4位
 
-                    sharedSessionId = terminal.createSession("Workspace: $workspaceName")
+                    sharedSessionId = terminalInstance.createSession("Workspace: $workspaceName")
 
                     // 保存会话 ID
                     workspaceTerminalSessions[workspacePath] = sharedSessionId
@@ -2508,7 +2530,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
                 val activeSessionId = sessionId ?: return@launch
 
-                terminal.executeCommand(activeSessionId, "cd \"${workspaceDir.absolutePath}\"")
+                terminalInstance.executeCommand(activeSessionId, "cd \"${workspaceDir.absolutePath}\"")
 
                 _workspaceCommandExecutionState.value =
                     WorkspaceCommandExecutionState(
@@ -2519,7 +2541,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         usesDedicatedSession = command.usesDedicatedSession
                     )
 
-                terminal.executeCommandFlow(activeSessionId, commandText).collect { event ->
+                terminalInstance.executeCommandFlow(activeSessionId, commandText).collect { event ->
                     val currentState = _workspaceCommandExecutionState.value
                     if (currentState?.sessionId != activeSessionId) {
                         return@collect
@@ -2630,12 +2652,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     @RequiresApi(Build.VERSION_CODES.O)
     fun cancelWorkspaceCommandExecution() {
         val currentState = _workspaceCommandExecutionState.value ?: return
-        if (!currentState.isRunning || currentState.isCancelling || terminal == null) {
+        if (!currentState.isRunning || currentState.isCancelling || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return
         }
 
         _workspaceCommandExecutionState.value = currentState.copy(isCancelling = true)
-        terminal.sendInterruptSignal(currentState.sessionId)
+        terminal?.sendInterruptSignal(currentState.sessionId)
     }
 
     private fun executeWorkspaceTool(command: CommandConfig, workspacePath: String, toolName: String) {

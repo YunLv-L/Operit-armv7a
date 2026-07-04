@@ -16,6 +16,8 @@ import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,6 +57,8 @@ class ApiConfigDelegate(
     private val functionalConfigManager = FunctionalConfigManager(context)
     private val characterCardManager = CharacterCardManager.getInstance(context)
     private val activePromptManager = ActivePromptManager.getInstance(context)
+    private val configScope =
+            CoroutineScope(SupervisorJob(coroutineScope.coroutineContext[Job]) + Dispatchers.IO)
 
     // State flows
     private val _isConfigured = MutableStateFlow(true) // 默认已配置
@@ -97,7 +101,7 @@ class ApiConfigDelegate(
     ) { isMaxMode, normalLength, maxLength ->
         if (isMaxMode) maxLength else normalLength
     }.stateIn(
-            coroutineScope,
+            configScope,
             kotlinx.coroutines.flow.SharingStarted.Eagerly,
             ModelConfigDefaults.DEFAULT_CONTEXT_LENGTH
     )
@@ -177,7 +181,7 @@ class ApiConfigDelegate(
                     }
                 }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     FunctionalConfigManager.DEFAULT_CONFIG_ID
                 )
@@ -187,7 +191,7 @@ class ApiConfigDelegate(
             effectiveChatConfigId
                 .flatMapLatest { configId -> modelConfigManager.getModelConfigFlow(configId) }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     ModelConfigData(
                         id = FunctionalConfigManager.DEFAULT_CONFIG_ID,
@@ -199,7 +203,7 @@ class ApiConfigDelegate(
             effectiveChatConfig
                 .map { config -> config.contextLength }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     ModelConfigDefaults.DEFAULT_CONTEXT_LENGTH
                 )
@@ -208,7 +212,7 @@ class ApiConfigDelegate(
             effectiveChatConfig
                 .map { config -> config.maxContextLength }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH
                 )
@@ -217,7 +221,7 @@ class ApiConfigDelegate(
             effectiveChatConfig
                 .map { config -> config.enableMaxContextMode }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     ModelConfigDefaults.DEFAULT_ENABLE_MAX_CONTEXT_MODE
                 )
@@ -231,7 +235,7 @@ class ApiConfigDelegate(
                 if (isMaxMode) maxLength else normalLength
             }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     ModelConfigDefaults.DEFAULT_CONTEXT_LENGTH
                 )
@@ -240,7 +244,7 @@ class ApiConfigDelegate(
             effectiveChatConfig
                 .map { config -> config.summaryTokenThreshold }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     ModelConfigDefaults.DEFAULT_SUMMARY_TOKEN_THRESHOLD
                 )
@@ -249,7 +253,7 @@ class ApiConfigDelegate(
             effectiveChatConfig
                 .map { config -> config.enableSummary }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     ModelConfigDefaults.DEFAULT_ENABLE_SUMMARY
                 )
@@ -258,7 +262,7 @@ class ApiConfigDelegate(
             effectiveChatConfig
                 .map { config -> config.enableSummaryByMessageCount }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     ModelConfigDefaults.DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT
                 )
@@ -267,13 +271,13 @@ class ApiConfigDelegate(
             effectiveChatConfig
                 .map { config -> config.summaryMessageCountThreshold }
                 .stateIn(
-                    coroutineScope,
+                    configScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
                     ModelConfigDefaults.DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD
                 )
 
     init {
-        coroutineScope.launch {
+        configScope.launch {
             try {
                 modelConfigManager.initializeIfNeeded()
                 functionalConfigManager.initializeIfNeeded()
@@ -290,7 +294,7 @@ class ApiConfigDelegate(
             }
         }
 
-        coroutineScope.launch {
+        configScope.launch {
             try {
                 modelConfigManager.initializeIfNeeded()
 
@@ -316,7 +320,7 @@ class ApiConfigDelegate(
         initializeSettingsCollection()
 
         // 异步创建AI服务实例，避免在主线程上执行阻塞操作
-        coroutineScope.launch(Dispatchers.IO) {
+        configScope.launch {
             AppLogger.d(TAG, "开始在后台线程创建EnhancedAIService")
             val enhancedAiService = EnhancedAIService.getInstance(context)
             AppLogger.d(TAG, "EnhancedAIService创建完成")
@@ -373,69 +377,69 @@ class ApiConfigDelegate(
 
     private fun initializeSettingsCollection() {
         // Collect feature toggle settings
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.featureTogglesFlow.collect { toggles ->
                 _featureToggles.value = toggles
             }
         }
 
         // Collect thinking mode setting
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.enableThinkingModeFlow.collect { enabled ->
                 _enableThinkingMode.value = enabled
             }
         }
 
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.thinkingQualityLevelFlow.collect { level ->
                 _thinkingQualityLevel.value = level
             }
         }
 
         // Collect memory auto update setting
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.enableMemoryAutoUpdateFlow.collect { enabled ->
                 _enableMemoryAutoUpdate.value = enabled
             }
         }
 
         // Collect auto read setting
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.enableAutoReadFlow.collect { enabled ->
                 _enableAutoRead.value = enabled
             }
         }
 
         // Collect keep screen on setting
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.keepScreenOnFlow.collect { enabled ->
                 _keepScreenOn.value = enabled
             }
         }
 
         // Collect enable tools setting
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.enableToolsFlow.collect { enabled ->
                 _enableTools.value = enabled
             }
         }
 
         // Collect tool prompt visibility setting
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.toolPromptVisibilityFlow.collect { visibility ->
                 _toolPromptVisibility.value = visibility
             }
         }
 
         // Collect disable stream output setting
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.disableStreamOutputFlow.collect { disabled ->
                 _disableStreamOutput.value = disabled
             }
         }
 
         // Collect disable user preference description setting
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.disableUserPreferenceDescriptionFlow.collect { disabled ->
                 _disableUserPreferenceDescription.value = disabled
             }
@@ -449,7 +453,7 @@ class ApiConfigDelegate(
      */
     fun useDefaultConfig(): Boolean {
         // 异步创建服务，避免阻塞
-        coroutineScope.launch(Dispatchers.IO) {
+        configScope.launch {
             AppLogger.d(TAG, "使用默认配置初始化服务")
             val enhancedAiService = EnhancedAIService.getInstance(context)
             withContext(Dispatchers.Main) {
@@ -482,7 +486,7 @@ class ApiConfigDelegate(
 
     /** 保存API设置 */
     fun saveApiSettings() {
-        coroutineScope.launch {
+        configScope.launch {
             try {
                 val configId = _activeConfigId.value
 
@@ -503,7 +507,9 @@ class ApiConfigDelegate(
                 }
 
                 // 通知ViewModel配置已更改
-                onConfigChanged(enhancedAiService)
+                withContext(Dispatchers.Main) {
+                    onConfigChanged(enhancedAiService)
+                }
 
                 // 更新已配置状态
                 _isConfigured.value = true
@@ -514,7 +520,7 @@ class ApiConfigDelegate(
     }
 
     fun toggleFeature(featureKey: String) {
-        coroutineScope.launch {
+        configScope.launch {
             val normalizedKey = featureKey.trim()
             if (normalizedKey.isEmpty()) {
                 return@launch
@@ -529,14 +535,14 @@ class ApiConfigDelegate(
 
     /** 切换思考模式 */
     fun toggleThinkingMode() {
-        coroutineScope.launch {
+        configScope.launch {
             val newValue = !_enableThinkingMode.value
             apiPreferences.updateThinkingSettings(enableThinkingMode = newValue)
         }
     }
 
     fun updateThinkingQualityLevel(level: Int) {
-        coroutineScope.launch {
+        configScope.launch {
             val clampedLevel = level.coerceIn(1, 4)
             apiPreferences.saveThinkingQualityLevel(clampedLevel)
             _thinkingQualityLevel.value = clampedLevel
@@ -545,7 +551,7 @@ class ApiConfigDelegate(
 
     /** 切换记忆自动更新 */
     fun toggleMemoryAutoUpdate() {
-        coroutineScope.launch {
+        configScope.launch {
             val newValue = !_enableMemoryAutoUpdate.value
             apiPreferences.saveEnableMemoryAutoUpdate(newValue)
             _enableMemoryAutoUpdate.value = newValue
@@ -554,7 +560,7 @@ class ApiConfigDelegate(
 
     /** 切换自动朗读 */
     fun toggleAutoRead() {
-        coroutineScope.launch {
+        configScope.launch {
             val newValue = !_enableAutoRead.value
             apiPreferences.saveEnableAutoRead(newValue)
             _enableAutoRead.value = newValue
@@ -563,7 +569,7 @@ class ApiConfigDelegate(
 
     /** 切换禁用流式输出 */
     fun toggleDisableStreamOutput() {
-        coroutineScope.launch {
+        configScope.launch {
             val newValue = !_disableStreamOutput.value
             apiPreferences.saveDisableStreamOutput(newValue)
             _disableStreamOutput.value = newValue
@@ -572,7 +578,7 @@ class ApiConfigDelegate(
 
     /** 切换禁用用户偏好描述 */
     fun toggleDisableUserPreferenceDescription() {
-        coroutineScope.launch {
+        configScope.launch {
             val newValue = !_disableUserPreferenceDescription.value
             apiPreferences.saveDisableUserPreferenceDescription(newValue)
             _disableUserPreferenceDescription.value = newValue
@@ -581,7 +587,7 @@ class ApiConfigDelegate(
 
     /** 更新上下文长度 */
     fun updateContextLength(length: Float) {
-        coroutineScope.launch {
+        configScope.launch {
             val configId = resolveEditableChatConfigId()
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             modelConfigManager.updateContextSettings(
@@ -593,7 +599,7 @@ class ApiConfigDelegate(
         }
     }
     fun updateSummaryTokenThreshold(threshold: Float) {
-        coroutineScope.launch {
+        configScope.launch {
             val configId = resolveEditableChatConfigId()
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             modelConfigManager.updateSummarySettings(
@@ -607,7 +613,7 @@ class ApiConfigDelegate(
     }
 
     fun updateMaxContextLength(length: Float) {
-        coroutineScope.launch {
+        configScope.launch {
             val configId = resolveEditableChatConfigId()
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             modelConfigManager.updateContextSettings(
@@ -620,7 +626,7 @@ class ApiConfigDelegate(
     }
 
     fun toggleEnableMaxContextMode() {
-        coroutineScope.launch {
+        configScope.launch {
             val configId = resolveEditableChatConfigId()
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             val newValue = !current.enableMaxContextMode
@@ -634,7 +640,7 @@ class ApiConfigDelegate(
     }
     /** 切换启用总结功能 */
     fun toggleEnableSummary() {
-        coroutineScope.launch {
+        configScope.launch {
             val configId = resolveEditableChatConfigId()
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             val newValue = !current.enableSummary
@@ -650,7 +656,7 @@ class ApiConfigDelegate(
 
     /** 切换按消息数量启用总结 */
     fun toggleEnableSummaryByMessageCount() {
-        coroutineScope.launch {
+        configScope.launch {
             val configId = resolveEditableChatConfigId()
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             val newValue = !current.enableSummaryByMessageCount
@@ -666,7 +672,7 @@ class ApiConfigDelegate(
 
     /** 更新总结消息数量阈值 */
     fun updateSummaryMessageCountThreshold(threshold: Int) {
-        coroutineScope.launch {
+        configScope.launch {
             val configId = resolveEditableChatConfigId()
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             modelConfigManager.updateSummarySettings(
@@ -681,7 +687,7 @@ class ApiConfigDelegate(
 
     /** 切换工具启用/禁用 */
     fun toggleTools() {
-        coroutineScope.launch {
+        configScope.launch {
             val newValue = !_enableTools.value
             apiPreferences.saveEnableTools(newValue)
             _enableTools.value = newValue
@@ -689,14 +695,14 @@ class ApiConfigDelegate(
     }
 
     fun saveToolPromptVisibility(toolName: String, isVisible: Boolean) {
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.saveToolPromptVisibility(toolName, isVisible)
             _toolPromptVisibility.value = _toolPromptVisibility.value + (toolName to isVisible)
         }
     }
 
     fun saveToolPromptVisibilityMap(visibilityMap: Map<String, Boolean>) {
-        coroutineScope.launch {
+        configScope.launch {
             apiPreferences.saveToolPromptVisibilityMap(visibilityMap)
             _toolPromptVisibility.value = visibilityMap
         }

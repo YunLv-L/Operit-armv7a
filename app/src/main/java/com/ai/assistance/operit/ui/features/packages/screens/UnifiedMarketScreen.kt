@@ -44,7 +44,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Store
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Comment
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -59,8 +63,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,7 +72,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,13 +80,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.ai.assistance.operit.R
@@ -171,29 +171,6 @@ private data class MarketMineAuthState(
     val isLoggedIn: Boolean = false,
     val currentUser: GitHubUser? = null
 )
-
-@Composable
-private fun RefreshMarketPaneOnEnter(
-    refreshKey: String,
-    onRefresh: () -> Unit
-) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val currentOnRefresh by rememberUpdatedState(onRefresh)
-
-    DisposableEffect(lifecycleOwner, refreshKey) {
-        val lifecycle = lifecycleOwner.lifecycle
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-            currentOnRefresh()
-        }
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                currentOnRefresh()
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
-    }
-}
 
 @Composable
 fun UnifiedMarketScreen(
@@ -316,9 +293,12 @@ private fun UnifiedMarketListPane(
     val hasMore by viewModel.hasMore.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val sortOption by viewModel.sortOption.collectAsState()
+    val featuredOnly by viewModel.featuredOnly.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val installStates by viewModel.installStates.collectAsState()
     val localInstallStates by viewModel.localInstallStates.collectAsState()
+    val listScrollIndex by viewModel.listScrollIndex.collectAsState()
+    val listScrollOffset by viewModel.listScrollOffset.collectAsState()
     BindMarketSearchToTopBar(
         enabled = true,
         searchQuery = searchQuery,
@@ -326,8 +306,8 @@ private fun UnifiedMarketListPane(
         searchPlaceholderRes = config.searchPlaceholderRes
     )
 
-    RefreshMarketPaneOnEnter(refreshKey = viewModelKey) {
-        viewModel.loadEntries()
+    LaunchedEffect(viewModelKey) {
+        viewModel.loadEntriesIfNeeded()
     }
 
     errorMessage?.let { error ->
@@ -346,10 +326,15 @@ private fun UnifiedMarketListPane(
         sortOption = sortOption,
         onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onSortOptionChanged = viewModel::onSortOptionChanged,
+        featuredOnly = featuredOnly,
+        onFeaturedOnlyChanged = viewModel::onFeaturedOnlyChanged,
         onRefresh = viewModel::loadEntries,
         onLoadMore = viewModel::loadMoreEntries,
         config = config,
         itemKey = { it.id },
+        initialFirstVisibleItemIndex = listScrollIndex,
+        initialFirstVisibleItemScrollOffset = listScrollOffset,
+        onScrollPositionChanged = viewModel::updateListScrollPosition,
         updatedAtSelector = { entry ->
             if (sortOption == com.ai.assistance.operit.ui.features.packages.market.MarketSortOption.UPDATED) {
                 entry.updatedAt ?: entry.publishedAt ?: entry.createdAt.orEmpty()
@@ -462,7 +447,7 @@ private fun MarketCategoryCard(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = category.name.ifBlank { marketCategoryLabel(category.id) },
+                    text = marketCategoryLabel(category.id),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -553,6 +538,7 @@ private fun MarketNotificationsPane() {
             )
         )
     val notifications by viewModel.notifications.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
     BindMarketSearchToTopBar(
@@ -579,7 +565,9 @@ private fun MarketNotificationsPane() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (notifications.isEmpty()) {
+        if (isLoading && notifications.isEmpty()) {
+            MarketAccountLoadingCard()
+        } else if (notifications.isEmpty()) {
             MarketEmptyCard(
                 title = stringResource(R.string.market_notifications_empty_title),
                 description = stringResource(R.string.market_notifications_empty_description)
@@ -601,34 +589,115 @@ private fun MarketNotificationsPane() {
 private fun MarketNotificationCard(notification: MarketV2Notification) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = notification.title.ifBlank { notification.kind },
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
+            Icon(
+                imageVector = notificationKindIcon(notification.kind),
+                contentDescription = null,
+                tint = notificationKindColor(notification.kind),
+                modifier = Modifier.size(24.dp).padding(top = 2.dp)
             )
-            if (notification.body.isNotBlank()) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = notificationKindLabel(notification.kind),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = notificationKindColor(notification.kind)
+                    )
+                    Text(
+                        text = relativeTime(notification.createdAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
                 Text(
-                    text = notification.body,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = notification.title.ifBlank { notificationKindLabel(notification.kind) },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-            }
-            if (notification.createdAt.isNotBlank()) {
-                Text(
-                    text = notification.createdAt.take(16).replace('T', ' '),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
+                if (notification.body.isNotBlank()) {
+                    Text(
+                        text = notification.body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
 }
+
+private fun notificationKindIcon(kind: String): ImageVector {
+    return when (kind) {
+        "comment_new", "comment_reply" -> Icons.Default.Comment
+        "review_approved", "entry_curated" -> Icons.Default.CheckCircle
+        "review_rejected" -> Icons.Default.Cancel
+        "review_changes" -> Icons.Default.Refresh
+        else -> Icons.Default.Notifications
+    }
+}
+
+private fun notificationKindLabel(kind: String): String {
+    return when (kind) {
+        "comment_new" -> "新评论"
+        "comment_reply" -> "回复了你的评论"
+        "review_approved" -> "已通过审核"
+        "review_rejected" -> "未通过审核"
+        "review_changes" -> "需要修改"
+        "entry_curated" -> "入选精选"
+        else -> kind
+    }
+}
+
+@Composable
+private fun notificationKindColor(kind: String): Color {
+    return when (kind) {
+        "comment_new", "comment_reply" -> MaterialTheme.colorScheme.primary
+        "review_approved" -> MaterialTheme.colorScheme.primary
+        "entry_curated" -> MaterialTheme.colorScheme.tertiary
+        "review_rejected" -> MaterialTheme.colorScheme.error
+        "review_changes" -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+private fun relativeTime(isoDate: String): String {
+    if (isoDate.isBlank()) return ""
+    return try {
+        val instant = java.time.Instant.parse(isoDate)
+        val now = java.time.Instant.now()
+        val duration = java.time.Duration.between(instant, now)
+        val seconds = duration.seconds
+        when {
+            seconds < 60 -> "刚刚"
+            seconds < 3600 -> "${seconds / 60} 分钟前"
+            seconds < 86400 -> "${seconds / 3600} 小时前"
+            seconds < 2592000 -> "${seconds / 86400} 天前"
+            seconds < 31104000 -> "${seconds / 2592000} 个月前"
+            else -> "${seconds / 31104000} 年前"
+        }
+    } catch (e: Exception) {
+        isoDate.take(16).replace("T", " ")
+    }
+}
+
 
 @Composable
 private fun MarketMinePane(

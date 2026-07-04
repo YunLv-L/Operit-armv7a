@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -43,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
@@ -89,7 +88,7 @@ fun MarketManageScaffold(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = true)
-                    .padding(16.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
                 if (!isLoggedIn) {
                     MarketManageLoginRequiredCard(
@@ -132,10 +131,11 @@ fun MarketManageScaffold(
 fun MarketManageItemCard(
     title: String,
     description: String,
-    entryId: String,
     isOpen: Boolean,
     modifier: Modifier = Modifier,
+    showActions: Boolean = true,
     onClick: (() -> Unit)? = null,
+    headerContent: @Composable RowScope.() -> Unit = {},
     supportingContent: @Composable ColumnScope.() -> Unit = {},
     actions: @Composable RowScope.() -> Unit
 ) {
@@ -153,14 +153,14 @@ fun MarketManageItemCard(
                 if (isOpen) {
                     MaterialTheme.colorScheme.surface
                 } else {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    MaterialTheme.colorScheme.surface
                 }
         ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -178,16 +178,14 @@ fun MarketManageItemCard(
 
                 Spacer(modifier = Modifier.width(12.dp))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MarketManagePublicationStatus(isOpen = isOpen)
-                    MarketManageEntryIdChip(entryId = entryId)
-                }
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = headerContent
+                )
             }
 
             if (description.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
@@ -197,19 +195,18 @@ fun MarketManageItemCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
+            Spacer(modifier = Modifier.height(8.dp))
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    content = supportingContent
-                )
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+                content = supportingContent
+            )
+
+            if (showActions) {
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                     content = actions
                 )
@@ -241,6 +238,124 @@ fun MarketManageLabelChip(
     }
 }
 
+@Composable
+fun MarketManageReviewFlow(
+    reviewState: MarketReviewState,
+    isOpen: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val reviewColor = marketReviewFlowColor(reviewState)
+    val publicationActive = reviewState == MarketReviewState.APPROVED && isOpen
+    val publicationLabel =
+        when (reviewState) {
+            MarketReviewState.APPROVED ->
+                if (isOpen) {
+                    stringResource(R.string.published)
+                } else {
+                    stringResource(R.string.market_review_step_scheduled)
+                }
+            MarketReviewState.PENDING,
+            MarketReviewState.CHANGES_REQUESTED,
+            MarketReviewState.REJECTED,
+            MarketReviewState.WITHDRAWN -> stringResource(R.string.market_review_step_unlisted)
+        }
+    val publicationColor =
+        if (publicationActive) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outline
+        }
+    val secondConnectorColor =
+        if (publicationActive) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outlineVariant
+        }
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        MarketReviewFlowStep(
+            label = stringResource(R.string.market_review_step_submitted),
+            color = MaterialTheme.colorScheme.primary,
+            active = true,
+            modifier = Modifier.weight(1f)
+        )
+        MarketReviewFlowConnector(color = reviewColor)
+        MarketReviewFlowStep(
+            label = stringResource(reviewState.labelResId()),
+            color = reviewColor,
+            active = true,
+            modifier = Modifier.weight(1f)
+        )
+        MarketReviewFlowConnector(color = secondConnectorColor)
+        MarketReviewFlowStep(
+            label = publicationLabel,
+            color = publicationColor,
+            active = publicationActive,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun MarketReviewFlowStep(
+    label: String,
+    color: Color,
+    active: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val contentColor =
+        if (active) {
+            color
+        } else {
+            MaterialTheme.colorScheme.outline
+        }
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            modifier = Modifier.size(7.dp),
+            shape = RoundedCornerShape(999.dp),
+            color = contentColor
+        ) {}
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = label,
+            color = contentColor,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun MarketReviewFlowConnector(color: Color) {
+    Surface(
+        modifier = Modifier
+            .width(10.dp)
+            .height(1.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = color.copy(alpha = 0.75f)
+    ) {}
+}
+
+@Composable
+private fun marketReviewFlowColor(reviewState: MarketReviewState): Color {
+    return when (reviewState) {
+        MarketReviewState.PENDING -> MaterialTheme.colorScheme.tertiary
+        MarketReviewState.APPROVED -> MaterialTheme.colorScheme.primary
+        MarketReviewState.CHANGES_REQUESTED -> MaterialTheme.colorScheme.secondary
+        MarketReviewState.REJECTED -> MaterialTheme.colorScheme.error
+        MarketReviewState.WITHDRAWN -> MaterialTheme.colorScheme.outline
+    }
+}
 
 @Composable
 fun MarketManageReviewStatusChip(
@@ -255,6 +370,7 @@ fun MarketManageReviewStatusChip(
             MarketReviewState.APPROVED -> MaterialTheme.colorScheme.secondaryContainer
             MarketReviewState.CHANGES_REQUESTED -> MaterialTheme.colorScheme.primaryContainer
             MarketReviewState.REJECTED -> MaterialTheme.colorScheme.errorContainer
+            MarketReviewState.WITHDRAWN -> MaterialTheme.colorScheme.surfaceVariant
         }
     val contentColor =
         when (reviewState) {
@@ -262,6 +378,7 @@ fun MarketManageReviewStatusChip(
             MarketReviewState.APPROVED -> MaterialTheme.colorScheme.onSecondaryContainer
             MarketReviewState.CHANGES_REQUESTED -> MaterialTheme.colorScheme.onPrimaryContainer
             MarketReviewState.REJECTED -> MaterialTheme.colorScheme.onErrorContainer
+            MarketReviewState.WITHDRAWN -> MaterialTheme.colorScheme.onSurfaceVariant
         }
 
     MarketManageLabelChip(
@@ -294,7 +411,10 @@ fun RowScope.MarketManageSecondaryActionButton(
     icon: ImageVector,
     onClick: () -> Unit
 ) {
-    IconButton(onClick = onClick) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(36.dp)
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
@@ -310,7 +430,10 @@ fun RowScope.MarketManageDangerActionButton(
     icon: ImageVector,
     onClick: () -> Unit
 ) {
-    IconButton(onClick = onClick) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(36.dp)
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
@@ -326,7 +449,10 @@ fun RowScope.MarketManagePrimaryActionButton(
     icon: ImageVector,
     onClick: () -> Unit
 ) {
-    IconButton(onClick = onClick) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(36.dp)
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
@@ -485,43 +611,4 @@ private fun MarketManageEmptyState(
     }
 }
 
-@Composable
-private fun MarketManagePublicationStatus(isOpen: Boolean) {
-    val statusColor =
-        if (isOpen) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.outline
-        }
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = if (isOpen) Icons.Default.CheckCircle else Icons.Default.Cancel,
-            contentDescription = null,
-            tint = statusColor,
-            modifier = Modifier.size(14.dp)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = if (isOpen) stringResource(R.string.published) else stringResource(R.string.removed),
-            color = statusColor,
-            style = MaterialTheme.typography.labelSmall
-        )
-    }
-}
-
-@Composable
-private fun MarketManageEntryIdChip(entryId: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = MaterialTheme.shapes.small
-    ) {
-        Text(
-            text = "#${entryId.take(8)}",
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
-        )
-    }
-}
 

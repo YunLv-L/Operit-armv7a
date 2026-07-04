@@ -44,21 +44,86 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
     // State for attachments
     private val _attachments = MutableStateFlow<List<AttachmentInfo>>(emptyList())
     val attachments: StateFlow<List<AttachmentInfo>> = _attachments
+    private val attachmentListLock = Any()
 
     // Events
     private val _toastEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val toastEvent: SharedFlow<String> = _toastEvent
 
     /** Adds multiple attachments in one shot (dedup by filePath) */
-    fun addAttachments(attachments: List<AttachmentInfo>) {
-        if (attachments.isEmpty()) return
-        val currentList = _attachments.value
-        val toAdd = attachments.filterNot { incoming ->
-            currentList.any { existing -> existing.filePath == incoming.filePath }
+    fun addAttachments(attachments: List<AttachmentInfo>): List<AttachmentInfo> {
+        if (attachments.isEmpty()) return emptyList()
+        synchronized(attachmentListLock) {
+            val currentList = _attachments.value
+            val existingPaths = currentList.mapTo(mutableSetOf()) { it.filePath }
+            val usedFileNames = currentList.mapTo(mutableSetOf()) { it.fileName }
+            val toAdd =
+                    attachments.mapNotNull { incoming ->
+                        if (!existingPaths.add(incoming.filePath)) {
+                            null
+                        } else {
+                            val uniqueFileName = uniqueAttachmentFileName(incoming.fileName, usedFileNames)
+                            usedFileNames.add(uniqueFileName)
+                            if (uniqueFileName == incoming.fileName) {
+                                incoming
+                            } else {
+                                incoming.copy(fileName = uniqueFileName)
+                            }
+                        }
+                    }
+            if (toAdd.isNotEmpty()) {
+                _attachments.value = currentList + toAdd
+            }
+            return toAdd
         }
-        if (toAdd.isNotEmpty()) {
-            _attachments.value = currentList + toAdd
+    }
+
+    private fun appendAttachment(attachment: AttachmentInfo): AttachmentInfo {
+        synchronized(attachmentListLock) {
+            val currentList = _attachments.value
+            val usedFileNames = currentList.mapTo(mutableSetOf()) { it.fileName }
+            val uniqueFileName = uniqueAttachmentFileName(attachment.fileName, usedFileNames)
+            val attachmentToAdd =
+                    if (uniqueFileName == attachment.fileName) {
+                        attachment
+                    } else {
+                        attachment.copy(fileName = uniqueFileName)
+                    }
+            _attachments.value = currentList + attachmentToAdd
+            return attachmentToAdd
         }
+    }
+
+    private fun replaceAttachmentByPath(attachment: AttachmentInfo) {
+        synchronized(attachmentListLock) {
+            val currentList = _attachments.value.filterNot { it.filePath == attachment.filePath }
+            val usedFileNames = currentList.mapTo(mutableSetOf()) { it.fileName }
+            val uniqueFileName = uniqueAttachmentFileName(attachment.fileName, usedFileNames)
+            val attachmentToAdd =
+                    if (uniqueFileName == attachment.fileName) {
+                        attachment
+                    } else {
+                        attachment.copy(fileName = uniqueFileName)
+                    }
+            _attachments.value = currentList + attachmentToAdd
+        }
+    }
+
+    private fun uniqueAttachmentFileName(fileName: String, usedFileNames: Set<String>): String {
+        if (!usedFileNames.contains(fileName)) return fileName
+
+        val dotIndex = fileName.lastIndexOf('.')
+        val hasExtension = dotIndex > 0 && dotIndex < fileName.lastIndex
+        val baseName = if (hasExtension) fileName.substring(0, dotIndex) else fileName
+        val extension = if (hasExtension) fileName.substring(dotIndex) else ""
+
+        var index = 2
+        var candidate = "${baseName}_$index$extension"
+        while (usedFileNames.contains(candidate)) {
+            index += 1
+            candidate = "${baseName}_$index$extension"
+        }
+        return candidate
     }
 
     /**
@@ -105,12 +170,9 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                                         fileSize = tempFile.length()
                                 )
 
-                        val currentList = _attachments.value
-                        if (!currentList.any { it.filePath == tempFile.absolutePath }) {
-                            _attachments.value = currentList + attachmentInfo
-                        }
+                        val addedAttachment = appendAttachment(attachmentInfo)
 
-                        _toastEvent.emit(context.getString(R.string.attachment_photo_added, fileName))
+                        _toastEvent.emit(context.getString(R.string.attachment_photo_added, addedAttachment.fileName))
                     } else {
                         AppLogger.e(TAG, "Failed to create temp file from camera URI")
                         _toastEvent.emit(context.getString(R.string.attachment_photo_process_failed))
@@ -199,13 +261,9 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                                     mimeType = resolvedMimeType,
                                     fileSize = tempFile.length()
                             )
+                    val addedAttachment = appendAttachment(attachmentInfo)
 
-                    val currentList = _attachments.value
-                    if (!currentList.any { it.filePath == tempFile.absolutePath }) {
-                        _attachments.value = currentList + attachmentInfo
-                    }
-
-                    _toastEvent.emit(context.getString(R.string.attachment_added, resolvedFileName))
+                    _toastEvent.emit(context.getString(R.string.attachment_added, addedAttachment.fileName))
                 } catch (e: Exception) {
                     _toastEvent.emit(context.getString(R.string.attachment_add_failed, e.message ?: ""))
                     AppLogger.e(TAG, "Error adding attachment", e)
@@ -232,11 +290,7 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                         noMediaFile.createNewFile()
                     }
 
-                    val tempFile =
-                            java.io.File(
-                                    externalDir,
-                                    "img_${System.currentTimeMillis()}.$fileExtension"
-                            )
+                    val tempFile = java.io.File.createTempFile("attachment_", ".$fileExtension", externalDir)
 
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         tempFile.outputStream().use { output -> input.copyTo(output) }
@@ -292,8 +346,7 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                 fileSize = packageContent.length.toLong(),
                 content = packageContent
             )
-        _attachments.value =
-            _attachments.value.filterNot { it.filePath == attachmentInfo.filePath } + attachmentInfo
+        replaceAttachmentByPath(attachmentInfo)
         _toastEvent.emit(context.getString(R.string.attachment_package_added, packageName))
     }
 
@@ -350,8 +403,7 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                 content = content,
             )
 
-        _attachments.value =
-            _attachments.value.filterNot { it.filePath == attachmentInfo.filePath } + attachmentInfo
+        replaceAttachmentByPath(attachmentInfo)
     }
 
     fun removeWorkspaceMentionAttachment(relativePath: String) {
@@ -501,18 +553,23 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
 
     /** Removes an attachment by its file path */
     fun removeAttachment(filePath: String) {
-        val currentList = _attachments.value
-        _attachments.value = currentList.filter { it.filePath != filePath }
+        synchronized(attachmentListLock) {
+            _attachments.value = _attachments.value.filter { it.filePath != filePath }
+        }
     }
 
     /** Clear all attachments */
     fun clearAttachments() {
-        _attachments.value = emptyList()
+        synchronized(attachmentListLock) {
+            _attachments.value = emptyList()
+        }
     }
 
     /** Update attachments with a new list */
     fun updateAttachments(newAttachments: List<AttachmentInfo>) {
-        _attachments.value = newAttachments
+        synchronized(attachmentListLock) {
+            _attachments.value = newAttachments
+        }
     }
 
     /**
@@ -576,8 +633,7 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                             content = content
                         )
 
-                    val currentList = _attachments.value
-                    _attachments.value = currentList + attachmentInfo
+                    appendAttachment(attachmentInfo)
 
                     _toastEvent.emit(context.getString(R.string.attachment_screen_content_added))
 
@@ -624,9 +680,7 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                                         content = notificationsContent
                                 )
 
-                        // 添加到附件列表
-                        val currentList = _attachments.value
-                        _attachments.value = currentList + attachmentInfo
+                        appendAttachment(attachmentInfo)
 
                         _toastEvent.emit(context.getString(R.string.attachment_notifications_added))
                     } else {
@@ -671,9 +725,7 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                                         content = locationContent
                                 )
 
-                        // 添加到附件列表
-                        val currentList = _attachments.value
-                        _attachments.value = currentList + attachmentInfo
+                        appendAttachment(attachmentInfo)
 
                         _toastEvent.emit(context.getString(R.string.attachment_location_added))
                     } else {
@@ -703,8 +755,7 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                             content = content
                         )
 
-                    val currentList = _attachments.value
-                    _attachments.value = currentList + attachmentInfo
+                    appendAttachment(attachmentInfo)
 
                     _toastEvent.emit(context.getString(R.string.attachment_time_added))
                 } catch (e: Exception) {
@@ -741,9 +792,7 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
                                     content = memoryContext
                             )
 
-                    // 添加到附件列表
-                    val currentList = _attachments.value
-                    _attachments.value = currentList + attachmentInfo
+                    appendAttachment(attachmentInfo)
 
                     val folderCountText = if (folderPaths.size == 1) {
                         context.getString(R.string.attachment_memory_folder_added, folderPaths[0])

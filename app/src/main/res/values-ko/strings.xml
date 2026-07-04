@@ -3997,7 +3997,8 @@
     <string name="supported_app_versions_colon">최소 버전: %1$s, 최대 버전: %2$s</string>
     <string name="min_supported_app_version">지원되는 최소 앱 버전</string>
     <string name="max_supported_app_version">지원되는 최대 앱 버전</string>
-    <string name="supported_version_input_hint">\'1.10.0\'과 같은 버전 번호를 입력하세요. 비워둘 수 있습니다.</string>
+    <string name="min_supported_version_input_hint">필수입니다. `1.10.0` 또는 `1.10.0+5` 같은 버전을 입력하세요.</string>
+    <string name="max_supported_version_input_hint">선택 사항입니다. `1.10.0` 또는 `1.10.0+5` 같은 버전을 입력하세요.</string>
     <string name="publish_failed_title">게시 실패</string>
     <string name="retry_market_registration">마켓 등록 재시도</string>
     <string name="update_to_market">마켓 업데이트</string>

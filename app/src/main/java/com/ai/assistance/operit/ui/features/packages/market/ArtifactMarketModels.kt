@@ -126,6 +126,7 @@ data class PublishArtifactDescriptor(
     val description: String,
     val categoryId: String,
     val version: String,
+    val allowPublicUpdates: Boolean = true,
     val sourceFile: File,
     val contentType: String,
     val assetName: String,
@@ -156,6 +157,7 @@ data class MarketRegistrationPayload(
     val displayName: String,
     val description: String,
     val categoryId: String,
+    val allowPublicUpdates: Boolean = true,
     val sourceFileName: String,
     val minSupportedAppVersion: String?,
     val maxSupportedAppVersion: String?
@@ -273,6 +275,7 @@ fun buildPublishArtifactDescriptor(
     detail: String,
     categoryId: String,
     version: String,
+    allowPublicUpdates: Boolean = true,
     minSupportedAppVersion: String?,
     maxSupportedAppVersion: String?,
     publishContext: ArtifactPublishClusterContext? = null
@@ -336,6 +339,7 @@ fun buildPublishArtifactDescriptor(
         description = description.trim().ifBlank { localArtifact.description },
         categoryId = resolvedCategoryId,
         version = cleanVersion,
+        allowPublicUpdates = allowPublicUpdates,
         sourceFile = localArtifact.sourceFile,
         contentType = inferArtifactContentType(type, extension),
         assetName = assetName,
@@ -403,6 +407,9 @@ fun validateSupportedAppVersions(
 ) {
     val normalizedMin = normalizeAppVersionOrNull(minSupportedAppVersion)
     val normalizedMax = normalizeAppVersionOrNull(maxSupportedAppVersion)
+    require(normalizedMin != null) {
+        "Minimum supported app version is required"
+    }
     if (normalizedMin != null && normalizedMax != null) {
         require(compareAppVersions(normalizedMin, normalizedMax) <= 0) {
             "Minimum supported app version cannot be greater than maximum supported app version"
@@ -444,6 +451,13 @@ fun isAppVersionSupported(
         return false
     }
     return true
+}
+
+fun isOperit2VersionAllowed(maxSupportedAppVersion: String?): Boolean {
+    val normalizedMax =
+        runCatching { normalizeAppVersionOrNull(maxSupportedAppVersion) }.getOrNull()
+            ?: return false
+    return compareAppVersions(normalizedMax, "2.0.0") >= 0
 }
 
 fun formatSupportedAppVersions(

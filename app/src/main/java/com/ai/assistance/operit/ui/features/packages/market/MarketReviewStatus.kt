@@ -32,7 +32,8 @@ enum class MarketReviewState {
     PENDING,
     APPROVED,
     CHANGES_REQUESTED,
-    REJECTED
+    REJECTED,
+    WITHDRAWN
 }
 
 enum class MarketReviewReason(
@@ -82,9 +83,14 @@ enum class MarketReviewReason(
 
     companion object {
         private val byLabelName = entries.associateBy { it.labelName.lowercase() }
+        private val byCode = entries.associateBy { it.code.lowercase() }
 
         fun fromLabelName(labelName: String): MarketReviewReason? {
             return byLabelName[labelName.trim().lowercase()]
+        }
+
+        fun fromCode(code: String): MarketReviewReason? {
+            return byCode[code.trim().lowercase()]
         }
     }
 }
@@ -101,6 +107,7 @@ fun MarketReviewState.labelResId(): Int {
         MarketReviewState.APPROVED -> R.string.market_review_approved
         MarketReviewState.CHANGES_REQUESTED -> R.string.market_review_changes_requested
         MarketReviewState.REJECTED -> R.string.market_review_rejected
+        MarketReviewState.WITHDRAWN -> R.string.removed
     }
 }
 
@@ -126,6 +133,7 @@ fun MarketV2Entry.resolveMarketReviewSnapshot(): MarketReviewSnapshot {
             "approved", "open" -> MarketReviewState.APPROVED
             "changes_requested" -> MarketReviewState.CHANGES_REQUESTED
             "rejected", "security_blocked" -> MarketReviewState.REJECTED
+            "withdrawn", "closed", "removed" -> MarketReviewState.WITHDRAWN
             else -> MarketReviewState.PENDING
         }
     return MarketReviewSnapshot(
@@ -141,11 +149,12 @@ fun MarketV2PublisherEntrySummary.resolveMarketReviewSnapshot(): MarketReviewSna
             "approved", "open" -> MarketReviewState.APPROVED
             "changes_requested" -> MarketReviewState.CHANGES_REQUESTED
             "rejected", "security_blocked" -> MarketReviewState.REJECTED
+            "withdrawn", "closed", "removed" -> MarketReviewState.WITHDRAWN
             else -> MarketReviewState.PENDING
         }
     return MarketReviewSnapshot(
         state = state,
-        reasons = emptyList(),
+        reasons = reasonCodes.mapNotNull { MarketReviewReason.fromCode(it) },
         isPubliclyApproved = state == MarketReviewState.APPROVED
     )
 }

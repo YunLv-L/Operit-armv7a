@@ -156,6 +156,7 @@ open class KimiProvider(
         var queuedToolCalls = JSONArray()
         val queuedToolCallIds = mutableListOf<String>()
         val openToolCallIds = mutableListOf<String>()
+        var nextToolCallOrdinal = 0
 
         fun appendQueuedAssistantToolText(text: String) {
             if (text.isBlank()) return
@@ -181,12 +182,12 @@ open class KimiProvider(
             appendQueuedAssistantToolText(textContent)
             appendQueuedAssistantReasoning(reasoningContent)
             for (i in 0 until toolCalls.length()) {
-                val toolCall = toolCalls.optJSONObject(i) ?: continue
+                val sourceToolCall = toolCalls.optJSONObject(i) ?: continue
+                val toolCall = JSONObject(sourceToolCall.toString())
+                val callId = generatedToolCallId(nextToolCallOrdinal++)
+                toolCall.put("id", callId)
                 queuedToolCalls.put(toolCall)
-                val callId = toolCall.optString("id", "").trim()
-                if (callId.isNotEmpty()) {
-                    queuedToolCallIds.add(callId)
-                }
+                queuedToolCallIds.add(callId)
             }
         }
 

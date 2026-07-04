@@ -71,7 +71,7 @@ class MistralProvider(
     }
 
     private fun generateMistralToolCallId(toolName: String, params: JSONObject, index: Int): String {
-        val raw = "$toolName:${'$'}{params.toString()}:$index"
+        val raw = "$toolName:${params.toString()}:$index"
         val hash = raw.hashCode()
         val positive = if (hash == Int.MIN_VALUE) 0 else kotlin.math.abs(hash)
         var base = positive.toString(36)

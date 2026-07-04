@@ -18,7 +18,11 @@ export function AiMessageComposable({
     <article className="cursor-ai-message">
       <div className="cursor-message-header">
         <strong className="cursor-message-label">Response</strong>
-        {detailText ? <span className="cursor-message-detail">{detailText}</span> : null}
+        {detailText ? (
+          <span className="cursor-message-detail" title={detailText}>
+            {detailText}
+          </span>
+        ) : null}
       </div>
       <div className="chat-message-content cursor-ai-body">
         <CustomXmlRenderer

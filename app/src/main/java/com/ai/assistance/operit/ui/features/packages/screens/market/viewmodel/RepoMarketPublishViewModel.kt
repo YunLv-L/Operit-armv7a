@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.data.api.GitHubApiService
 import com.ai.assistance.operit.data.api.MarketStatsApiService
 import com.ai.assistance.operit.data.api.MarketV2EntryUpdateRequest
 import com.ai.assistance.operit.data.api.MarketV2Entry
@@ -20,6 +21,7 @@ import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
 import com.ai.assistance.operit.ui.features.github.GitHubOAuthCoordinator
 import com.ai.assistance.operit.ui.features.packages.market.MarketStatsType
 import com.ai.assistance.operit.util.AppLogger
+import java.net.URI
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,10 +34,7 @@ data class RepoPublishDraft(
     val repositoryUrl: String = "",
     val installConfig: String = "",
     val category: String = "",
-    val refType: String = "branch",
-    val refName: String = "main",
-    val manifestPath: String = "",
-    val subdir: String = ""
+    val allowPublicUpdates: Boolean = true
 )
 
 class RepoMarketPublishViewModel(
@@ -43,6 +42,7 @@ class RepoMarketPublishViewModel(
     private val type: MarketStatsType
 ) : ViewModel() {
     private val marketStatsApiService = MarketStatsApiService()
+    private val githubApiService = GitHubApiService(context)
     val githubAuth: GitHubAuthPreferences = GitHubAuthPreferences.getInstance(context)
 
     private val _isLoading = MutableStateFlow(false)
@@ -62,10 +62,7 @@ class RepoMarketPublishViewModel(
             repositoryUrl = sharedPrefs.getString("repositoryUrl", "") ?: "",
             installConfig = sharedPrefs.getString("installConfig", "") ?: "",
             category = sharedPrefs.getString("category", "") ?: "",
-            refType = sharedPrefs.getString("refType", "branch") ?: "branch",
-            refName = sharedPrefs.getString("refName", "main") ?: "main",
-            manifestPath = sharedPrefs.getString("manifestPath", "") ?: "",
-            subdir = sharedPrefs.getString("subdir", "") ?: ""
+            allowPublicUpdates = sharedPrefs.getBoolean("allowPublicUpdates", true)
         )
 
     fun parseEntry(entry: MarketV2Entry): RepoPublishDraft {
@@ -76,8 +73,7 @@ class RepoMarketPublishViewModel(
             repositoryUrl = entry.source?.url.orEmpty(),
             installConfig = entry.latestVersion?.installConfig.orEmpty(),
             category = entry.categoryId,
-            refType = "branch",
-            refName = "main"
+            allowPublicUpdates = entry.allowPublicUpdates
         )
     }
 
@@ -88,10 +84,7 @@ class RepoMarketPublishViewModel(
         repositoryUrl: String,
         installConfig: String = "",
         category: String = "",
-        refType: String = "branch",
-        refName: String = "main",
-        manifestPath: String = "",
-        subdir: String = ""
+        allowPublicUpdates: Boolean = true
     ) {
         sharedPrefs.edit().apply {
             putString("title", title)
@@ -100,10 +93,7 @@ class RepoMarketPublishViewModel(
             putString("repositoryUrl", repositoryUrl)
             putString("installConfig", installConfig)
             putString("category", category)
-            putString("refType", refType)
-            putString("refName", refName)
-            putString("manifestPath", manifestPath)
-            putString("subdir", subdir)
+            putBoolean("allowPublicUpdates", allowPublicUpdates)
             apply()
         }
     }
@@ -150,10 +140,7 @@ class RepoMarketPublishViewModel(
         version: String,
         installConfig: String = "",
         category: String = "",
-        refType: String = "branch",
-        refName: String = "main",
-        manifestPath: String = "",
-        subdir: String = ""
+        allowPublicUpdates: Boolean = true
     ): Result<Unit> {
         return submit(
             entryId = null,
@@ -164,36 +151,38 @@ class RepoMarketPublishViewModel(
             version = version,
             installConfig = installConfig,
             category = category,
-            refType = refType,
-            refName = refName,
-            manifestPath = manifestPath,
-            subdir = subdir
+            allowPublicUpdates = allowPublicUpdates
         )
     }
 
     suspend fun publishNewVersion(
         entry: MarketV2Entry,
+        title: String,
+        description: String,
+        detail: String,
+        category: String,
+        allowPublicUpdates: Boolean,
         version: String,
-        installConfig: String = "",
-        refType: String = "branch",
-        refName: String = "main",
-        manifestPath: String = "",
-        subdir: String = ""
+        installConfig: String = ""
     ): Result<Unit> {
         validateNewVersion(entry, version)
+        val hasEntryPatch =
+            title != entry.title ||
+                description != entry.description ||
+                detail != entry.detail ||
+                category != entry.categoryId ||
+                allowPublicUpdates != entry.allowPublicUpdates
         return submit(
             entryId = entry.id,
-            title = entry.title,
-            description = entry.description,
-            detail = entry.detail,
+            title = title,
+            description = description,
+            detail = detail,
             repositoryUrl = entry.source?.url.orEmpty(),
             version = version,
             installConfig = installConfig,
-            category = entry.categoryId,
-            refType = refType,
-            refName = refName,
-            manifestPath = manifestPath,
-            subdir = subdir
+            category = category,
+            allowPublicUpdates = allowPublicUpdates,
+            includeEntryPatch = hasEntryPatch
         )
     }
 
@@ -202,7 +191,8 @@ class RepoMarketPublishViewModel(
         title: String,
         description: String,
         detail: String,
-        category: String
+        category: String,
+        allowPublicUpdates: Boolean
     ): Result<Unit> {
         if (!githubAuth.isLoggedIn()) {
             return Result.failure(IllegalStateException(loginRequiredMessage()))
@@ -217,7 +207,8 @@ class RepoMarketPublishViewModel(
                     title = title,
                     description = description,
                     detail = detail,
-                    categoryId = category
+                    categoryId = category,
+                    allowPublicUpdates = allowPublicUpdates
                 )
             marketStatsApiService.updateEntry(entry.id, request).map { Unit }
         } catch (e: Exception) {
@@ -237,10 +228,8 @@ class RepoMarketPublishViewModel(
         version: String,
         installConfig: String,
         category: String,
-        refType: String,
-        refName: String,
-        manifestPath: String,
-        subdir: String
+        allowPublicUpdates: Boolean,
+        includeEntryPatch: Boolean = false
     ): Result<Unit> {
         if (!githubAuth.isLoggedIn()) {
             return Result.failure(IllegalStateException(loginRequiredMessage()))
@@ -259,16 +248,13 @@ class RepoMarketPublishViewModel(
                     version = version,
                     installConfig = installConfig,
                     category = category,
-                    refType = refType,
-                    refName = refName,
-                    manifestPath = manifestPath,
-                    subdir = subdir
+                    allowPublicUpdates = allowPublicUpdates
                 )
             val result =
                 if (entryId == null) {
                     marketStatsApiService.publish(request).map { Unit }
                 } else {
-                    marketStatsApiService.publishNewVersion(entryId = entryId, request = request).map { Unit }
+                    marketStatsApiService.publishNewVersion(entryId = entryId, request = request, includeEntryPatch = includeEntryPatch).map { Unit }
                 }
             result
         } catch (e: Exception) {
@@ -279,7 +265,7 @@ class RepoMarketPublishViewModel(
         }
     }
 
-    private fun buildV2PublishRequest(
+    private suspend fun buildV2PublishRequest(
         title: String,
         description: String,
         detail: String,
@@ -287,32 +273,124 @@ class RepoMarketPublishViewModel(
         version: String,
         installConfig: String,
         category: String,
-        refType: String,
-        refName: String,
-        manifestPath: String,
-        subdir: String
+        allowPublicUpdates: Boolean
     ): MarketV2PublishRequest {
+        val repoTarget = resolveRepoPublishTarget(repositoryUrl)
         return MarketV2PublishRequest(
             type = type.wireValue,
             title = title,
             description = description,
             detail = detail,
             categoryId = category,
+            allowPublicUpdates = allowPublicUpdates,
             version = MarketV2PublishVersion(
                 version = version.ifBlank { "1.0.0" },
-                formatVersion = "${type.wireValue}_v2",
-                minAppVersion = CURRENT_APP_VERSION
+                formatVer = "${type.wireValue}_v2",
+                minAppVer = CURRENT_APP_VERSION
             ),
-            source = MarketV2PublishSource(url = repositoryUrl),
+            source = MarketV2PublishSource(
+                kind = "github_repo",
+                url = repoTarget.sourceUrl
+            ),
             repoVersion = MarketV2PublishRepoVersion(
-                refType = refType.ifBlank { "branch" },
-                refName = refName.ifBlank { "main" },
-                manifestPath = manifestPath,
-                subdir = subdir,
+                refType = repoTarget.refType,
+                refName = repoTarget.refName,
                 installConfig = if (type == MarketStatsType.MCP) installConfig.ifBlank { "{}" } else "{}"
             )
         )
     }
+
+    private suspend fun resolveRepoPublishTarget(repositoryUrl: String): RepoPublishTarget {
+        val parsed = parseRepoPublishTarget(repositoryUrl)
+            ?: throw IllegalStateException(context.getString(R.string.skill_invalid_github_url))
+        val refName =
+            parsed.refName
+                ?: githubApiService.getRepository(parsed.owner, parsed.repo).getOrThrow().defaultBranch.ifBlank {
+                    throw IllegalStateException(context.getString(R.string.skill_cannot_determine_default_branch, "${parsed.owner}/${parsed.repo}"))
+                }
+        return RepoPublishTarget(
+            sourceUrl = parsed.sourceUrl,
+            refType = parsed.refType,
+            refName = refName
+        )
+    }
+
+    private fun parseRepoPublishTarget(inputUrlRaw: String): ParsedRepoPublishTarget? {
+        val inputUrl = inputUrlRaw.trim()
+        if (inputUrl.isBlank()) return null
+        val urlWithScheme =
+            if (inputUrl.startsWith("http://", ignoreCase = true) || inputUrl.startsWith("https://", ignoreCase = true)) {
+                inputUrl
+            } else {
+                "https://$inputUrl"
+            }
+        val uri =
+            try {
+                URI(urlWithScheme.substringBefore('#'))
+            } catch (_: Exception) {
+                return null
+            }
+        val host = uri.host?.lowercase() ?: return null
+        val segments = uri.path.orEmpty().split('/').filter { it.isNotBlank() }
+        fun cleanRepoName(repoRaw: String): String = repoRaw.removeSuffix(".git")
+        fun normalizeGithubSourceUrl(owner: String, repo: String, rest: List<String>): String =
+            "https://github.com/$owner/$repo${if (rest.isNotEmpty()) "/${rest.joinToString("/")}" else ""}"
+
+        return when {
+            host == "github.com" || host.endsWith(".github.com") -> {
+                if (segments.size < 2) return null
+                val owner = segments[0]
+                val repo = cleanRepoName(segments[1])
+                if (owner.isBlank() || repo.isBlank()) return null
+                val refType: String
+                val refName: String?
+                if (segments.size >= 4 && (segments[2] == "tree" || segments[2] == "blob")) {
+                    refType = "branch"
+                    refName = segments[3]
+                } else {
+                    refType = "branch"
+                    refName = null
+                }
+                ParsedRepoPublishTarget(
+                    owner = owner,
+                    repo = repo,
+                    sourceUrl = normalizeGithubSourceUrl(owner, repo, segments.drop(2)),
+                    refType = refType,
+                    refName = refName
+                )
+            }
+
+            host == "raw.githubusercontent.com" -> {
+                if (segments.size < 4) return null
+                val owner = segments[0]
+                val repo = cleanRepoName(segments[1])
+                val refName = segments[2]
+                ParsedRepoPublishTarget(
+                    owner = owner,
+                    repo = repo,
+                    sourceUrl = "https://raw.githubusercontent.com/$owner/$repo/${segments.drop(2).joinToString("/")}",
+                    refType = "branch",
+                    refName = refName
+                )
+            }
+
+            else -> null
+        }
+    }
+
+    private data class ParsedRepoPublishTarget(
+        val owner: String,
+        val repo: String,
+        val sourceUrl: String,
+        val refType: String,
+        val refName: String?
+    )
+
+    private data class RepoPublishTarget(
+        val sourceUrl: String,
+        val refType: String,
+        val refName: String
+    )
 
     private fun validateNewVersion(entry: MarketV2Entry, version: String) {
         val requestedVersion = version.trim().removePrefix("v").removePrefix("V").ifBlank { "1.0.0" }

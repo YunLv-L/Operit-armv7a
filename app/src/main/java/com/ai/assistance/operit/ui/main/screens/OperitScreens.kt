@@ -37,6 +37,7 @@ import com.ai.assistance.operit.ui.features.packages.screens.ArtifactPublishScre
 import com.ai.assistance.operit.ui.features.packages.screens.RepoMarketPublishScreen
 import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketManageScreen
 import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketCategoryScreen
+import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketAuthorScreen
 import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketDetailEntryScreen
 import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketNotificationsScreen
 import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketScreen
@@ -295,9 +296,55 @@ sealed class Screen(
             UnifiedMarketDetailEntryScreen(
                 initialEntry = entry,
                 fromManage = fromManage,
-                onNavigateBack = onGoBack
+                onNavigateBack = onGoBack,
+                onPublishNewVersion = { target ->
+                    when (target.type.lowercase()) {
+                        "script", "package" -> navigateTo(ArtifactContinuePublish(target.toArtifactPublishClusterContext()))
+                        "skill" -> navigateTo(RepoPublishVersion(MarketStatsType.SKILL, target))
+                        "mcp" -> navigateTo(RepoPublishVersion(MarketStatsType.MCP, target))
+                    }
+                },
+                onNavigateToAuthor = { authorId, authorLogin, authorAvatarUrl ->
+                    navigateTo(
+                        MarketAuthor(
+                            authorId = authorId,
+                            authorLogin = authorLogin,
+                            authorAvatarUrl = authorAvatarUrl
+                        )
+                    )
+                }
             )
         }
+    }
+
+    data class MarketAuthor(
+        val authorId: String,
+        val authorLogin: String,
+        val authorAvatarUrl: String
+    ) : Screen(navItem = NavItem.Packages) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            UnifiedMarketAuthorScreen(
+                authorId = authorId,
+                authorLogin = authorLogin,
+                authorAvatarUrl = authorAvatarUrl,
+                onNavigateToDetail = { issue ->
+                    navigateTo(MarketEntryDetail(issue))
+                }
+            )
+        }
+
+        @Composable
+        override fun getTitle(): String =
+            authorLogin.ifBlank { authorId.removePrefix("gh_") }
     }
 
     data object MarketManage : Screen(navItem = NavItem.Packages, titleRes = R.string.market_section_manage) {
