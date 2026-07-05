@@ -142,6 +142,42 @@ class SafFileSystemTools(
         return null
     }
 
+    private fun requireSafCreateMimeType(fileName: String): String {
+        val normalizedName = fileName.lowercase(Locale.ROOT)
+        val extension = fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)
+
+        return when {
+            normalizedName in setOf("license", "notice", "readme", "changelog", "dockerfile", "makefile") -> "text/plain"
+            normalizedName in setOf(".gitignore", ".gitattributes", ".editorconfig", ".env", ".npmrc", ".yarnrc") -> "text/plain"
+            extension == "md" || extension == "markdown" -> "text/markdown"
+            extension == "txt" || extension == "log" -> "text/plain"
+            extension == "json" -> "application/json"
+            extension == "xml" -> "application/xml"
+            extension == "html" || extension == "htm" -> "text/html"
+            extension == "css" -> "text/css"
+            extension == "csv" -> "text/csv"
+            extension == "js" || extension == "mjs" || extension == "cjs" -> "text/javascript"
+            extension == "ts" || extension == "tsx" -> "text/typescript"
+            extension == "kt" || extension == "kts" -> "text/x-kotlin"
+            extension == "java" -> "text/x-java-source"
+            extension == "py" -> "text/x-python"
+            extension == "sh" || extension == "bash" -> "application/x-sh"
+            extension == "yaml" || extension == "yml" -> "application/x-yaml"
+            extension == "toml" -> "application/toml"
+            extension == "ini" || extension == "conf" || extension == "properties" -> "text/plain"
+            extension == "svg" -> "image/svg+xml"
+            extension == "png" -> "image/png"
+            extension == "jpg" || extension == "jpeg" -> "image/jpeg"
+            extension == "webp" -> "image/webp"
+            extension == "gif" -> "image/gif"
+            extension == "pdf" -> "application/pdf"
+            extension == "zip" -> "application/zip"
+            extension == "gz" -> "application/gzip"
+            extension == "apk" -> "application/vnd.android.package-archive"
+            else -> throw IllegalArgumentException("Unsupported file extension for SAF create: $fileName")
+        }
+    }
+
     suspend fun writeFileBinary(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val base64Content = tool.parameters.find { it.name == "base64Content" }?.value ?: ""
@@ -169,7 +205,7 @@ class SafFileSystemTools(
                             result = FileOperationData(operation = "write_binary", env = envLabel, path = path, successful = false, details = "Invalid repository path"),
                             error = "Invalid repository path: $parentStr"
                         )
-                    val created = createChildDocumentOrNull(parentUri, name, "application/octet-stream")
+                    val created = createChildDocumentOrNull(parentUri, name, requireSafCreateMimeType(name))
                         ?: return@withContext ToolResult(
                             toolName = tool.name,
                             success = false,
@@ -190,7 +226,7 @@ class SafFileSystemTools(
                                         result = FileOperationData(operation = "write_binary", env = envLabel, path = path, successful = false, details = "Invalid repository path"),
                                         error = "Invalid repository path: $parentPath"
                                     )
-                                createChildDocumentOrNull(parentUri, name, "application/octet-stream")
+                                createChildDocumentOrNull(parentUri, name, requireSafCreateMimeType(name))
                                     ?: return@withContext ToolResult(
                                         toolName = tool.name,
                                         success = false,
@@ -828,7 +864,7 @@ class SafFileSystemTools(
                             error = "Invalid repository path: $parentStr"
                         )
 
-                    val created = createChildDocumentOrNull(parentUri, name, "text/plain")
+                    val created = createChildDocumentOrNull(parentUri, name, requireSafCreateMimeType(name))
                         ?: return@withContext ToolResult(
                             toolName = tool.name,
                             success = false,
@@ -861,7 +897,7 @@ class SafFileSystemTools(
                                         ),
                                         error = "Invalid repository path: $parentPath"
                                     )
-                                createChildDocumentOrNull(parentUri, name, "text/plain")
+                                createChildDocumentOrNull(parentUri, name, requireSafCreateMimeType(name))
                                     ?: return@withContext ToolResult(
                                         toolName = tool.name,
                                         success = false,
