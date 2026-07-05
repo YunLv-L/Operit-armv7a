@@ -633,6 +633,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         apiConfigDelegate.saveToolPromptVisibilityMap(visibilityMap)
     }
 
+    val toolPromptOrder: StateFlow<List<String>> by lazy { apiConfigDelegate.toolPromptOrder }
+
+    fun saveToolPromptOrder(order: List<String>) {
+        apiConfigDelegate.saveToolPromptOrder(order)
+    }
+
     fun toggleDisableStreamOutput() {
         apiConfigDelegate.toggleDisableStreamOutput()
     }

@@ -52,6 +52,7 @@ import com.ai.assistance.operit.core.tools.EnvVar
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.mcp.MCPRepository
 import com.ai.assistance.operit.data.preferences.EnvPreferences
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.skill.SkillRepository
 import com.ai.assistance.operit.ui.features.packages.screens.mcp.components.MCPEnvironmentVariablesDialog
 import com.ai.assistance.operit.data.model.ToolResult
@@ -138,6 +139,7 @@ fun PackageManagerScreen(
     val skillRepository = remember { SkillRepository.getInstance(context.applicationContext) }
 
     val envPreferences = remember { EnvPreferences.getInstance(context) }
+    val apiPreferences = remember { ApiPreferences.getInstance(context) }
 
     // State for available and imported packages
     val availablePackages = remember { mutableStateOf<Map<String, ToolPackage>>(emptyMap()) }
@@ -188,6 +190,8 @@ fun PackageManagerScreen(
         remember { mutableStateOf<List<PackageManager.PackageLoadErrorInfo>>(emptyList()) }
     var showPackageLoadErrorsDialog by remember { mutableStateOf(false) }
     var importErrorMessage by remember { mutableStateOf<String?>(null) }
+    var pluginOrder by remember { mutableStateOf<List<String>>(emptyList()) }
+    var skillOrder by remember { mutableStateOf<List<String>>(emptyList()) }
     var showQuickPluginCreatorDialog by remember { mutableStateOf(false) }
     var quickPluginRequirement by rememberSaveable { mutableStateOf("") }
     var quickPluginSetupRunning by remember { mutableStateOf(false) }
@@ -469,6 +473,10 @@ fun PackageManagerScreen(
             packageLoadErrorInfos.value = loadResult.packageLoadErrorInfos
             // 初始化UI显示状态
             visibleImportedPackages.value = importedPackages.value.toList()
+            // 加载插件排序
+            pluginOrder = apiPreferences.getPluginOrder()
+            // 加载技能排序
+            skillOrder = apiPreferences.getSkillOrder()
         } catch (e: Exception) {
             AppLogger.e("PackageManagerScreen", "Failed to load packages", e)
         } finally {
@@ -823,7 +831,14 @@ fun PackageManagerScreen(
                                         )
                                     }
                                 }
-                            }
+                            },
+                            pluginOrder = pluginOrder,
+                            onSavePluginOrder = { newOrder ->
+                                pluginOrder = newOrder
+                                scope.launch {
+                                    apiPreferences.savePluginOrder(newOrder)
+                                }
+                            },
                         )
                     }
 
@@ -891,7 +906,14 @@ fun PackageManagerScreen(
                             skillRepository = skillRepository,
                             snackbarHostState = snackbarHostState,
                             onNavigateToSkillMarket = onNavigateToSkillMarket,
-                            searchQuery = skillSearchQuery
+                            searchQuery = skillSearchQuery,
+                            skillOrder = skillOrder,
+                            onSaveSkillOrder = { newOrder ->
+                                skillOrder = newOrder
+                                scope.launch {
+                                    apiPreferences.saveSkillOrder(newOrder)
+                                }
+                            },
                         )
                     }
 

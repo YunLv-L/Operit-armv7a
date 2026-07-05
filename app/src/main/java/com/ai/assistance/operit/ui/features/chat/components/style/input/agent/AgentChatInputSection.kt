@@ -218,6 +218,8 @@ fun AgentChatInputSection(
     onNavigateToPackageManager: () -> Unit = {},
     toolPromptVisibility: Map<String, Boolean> = emptyMap(),
     onSaveToolPromptVisibilityMap: (Map<String, Boolean>) -> Unit = {},
+    toolOrder: List<String> = emptyList(),
+    onSaveToolOrder: (List<String>) -> Unit = {},
     onManualMemoryUpdate: () -> Unit = {},
     onNavigateToModelConfig: () -> Unit = {},
     characterCardBoundChatModelConfigId: String? = null,
@@ -1445,6 +1447,8 @@ fun AgentChatInputSection(
                 onToggleDisableUserPreferenceDescription = onToggleDisableUserPreferenceDescription,
                 toolPromptVisibility = toolPromptVisibility,
                 onSaveToolPromptVisibilityMap = onSaveToolPromptVisibilityMap,
+                toolOrder = toolOrder,
+                onSaveToolOrder = onSaveToolOrder,
                 onNavigateToPackageManager = onNavigateToPackageManager,
                 onManualMemoryUpdate = onManualMemoryUpdate,
                 onDismiss = { showExtraSettingsPopup.value = false },
@@ -2265,6 +2269,8 @@ private fun AgentExtraSettingsPopup(
     onToggleDisableUserPreferenceDescription: () -> Unit,
     toolPromptVisibility: Map<String, Boolean>,
     onSaveToolPromptVisibilityMap: (Map<String, Boolean>) -> Unit,
+    toolOrder: List<String> = emptyList(),
+    onSaveToolOrder: (List<String>) -> Unit = {},
     onNavigateToPackageManager: () -> Unit,
     onManualMemoryUpdate: () -> Unit,
     onDismiss: () -> Unit,
@@ -2466,7 +2472,9 @@ private fun AgentExtraSettingsPopup(
             ToolPromptManagerDialog(
                 visible = showToolPromptManagerDialog,
                 toolPromptVisibility = toolPromptVisibility,
+                toolOrder = toolOrder,
                 onSaveToolPromptVisibilityMap = onSaveToolPromptVisibilityMap,
+                onSaveToolOrder = onSaveToolOrder,
                 onDismissRequest = { showToolPromptManagerDialog = false },
                 onManagePackagesClick = {
                     showToolPromptManagerDialog = false

@@ -19,8 +19,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -39,6 +40,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -78,6 +81,8 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @SuppressLint("LocalContextGetResourceValueCall")
 @Composable
@@ -85,7 +90,9 @@ fun SkillConfigScreen(
     skillRepository: SkillRepository,
     snackbarHostState: SnackbarHostState,
     onNavigateToSkillMarket: () -> Unit = {},
-    searchQuery: String = ""
+    searchQuery: String = "",
+    skillOrder: List<String> = emptyList(),
+    onSaveSkillOrder: (List<String>) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -216,16 +223,21 @@ fun SkillConfigScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             val displayedSkills =
-                remember(skills, searchQuery) {
+                remember(skills, searchQuery, skillOrder) {
                     val searchText = searchQuery.trim()
-                    skills.values
+                    val filtered = skills.values
                         .filter { skill ->
                             searchText.isEmpty() ||
                                 skill.name.contains(searchText, ignoreCase = true) ||
                                 skill.description.contains(searchText, ignoreCase = true) ||
                                 skill.directory.absolutePath.contains(searchText, ignoreCase = true)
                         }
-                        .sortedBy { it.name }
+                    if (searchText.isEmpty() && skillOrder.isNotEmpty()) {
+                        val orderIndex = skillOrder.withIndex().associate { (i, name) -> name to i }
+                        filtered.sortedBy { orderIndex[it.name] ?: Int.MAX_VALUE }
+                    } else {
+                        filtered.sortedBy { it.name }
+                    }
                 }
 
             if (skills.isEmpty()) {
@@ -235,12 +247,25 @@ fun SkillConfigScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
+                var orderedSkills by remember(displayedSkills) {
+                    mutableStateOf(displayedSkills)
+                }
+                val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+                val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                    orderedSkills = orderedSkills.toMutableList().apply {
+                        add(to.index, removeAt(from.index))
+                    }
+                    val newOrder = orderedSkills.map { it.name }
+                    onSaveSkillOrder(newOrder)
+                }
+
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 120.dp)
                 ) {
-                    if (displayedSkills.isEmpty()) {
+                    if (orderedSkills.isEmpty()) {
                         item(key = "empty_skill_search_state") {
                             Text(
                                 text = stringResource(R.string.no_matching_skills_found),
@@ -250,30 +275,69 @@ fun SkillConfigScreen(
                         }
                     }
 
-                    items(displayedSkills, key = { it.name }) { skill ->
-                        SkillListItem(
-                            skill = skill,
-                            skillVisibilityPreferences = skillVisibilityPreferences,
-                            onClick = {
-                                val targetPath = skill.directory.absolutePath
-                                selectedSkill = skill
-                                selectedSkillDetail = null
-                                isSkillDetailLoading = true
-                                scope.launch {
-                                    val detail =
-                                        withContext(Dispatchers.IO) {
-                                            buildSkillDetailDialogData(
-                                                skill = skill,
-                                                skillContent = skillRepository.readSkillContent(skill.name).orEmpty()
-                                            )
-                                        }
-                                    if (selectedSkill?.directory?.absolutePath == targetPath) {
-                                        selectedSkillDetail = detail
-                                        isSkillDetailLoading = false
-                                    }
-                                }
-                            }
+                    itemsIndexed(
+                        items = orderedSkills,
+                        key = { _, skill -> skill.name }
+                    ) { index, skill ->
+                        ReorderableItem(
+                            reorderableState,
+                            key = skill.name,
+                            animateItemModifier = Modifier.animateItem(
+                            fadeInSpec = spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
+                            placementSpec = spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
+                            fadeOutSpec = spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)
                         )
+                        ) { isDragging ->
+                            val elevation = if (isDragging) 8.dp else 0.dp
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .then(
+                                        if (isDragging) {
+                                            Modifier.shadow(elevation, RoundedCornerShape(14.dp))
+                                        } else {
+                                            Modifier
+                                        }
+                                    ),
+                                color = if (isDragging) {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                },
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                SkillListItem(
+                                    skill = skill,
+                                    skillVisibilityPreferences = skillVisibilityPreferences,
+                                    onClick = {
+                                        val targetPath = skill.directory.absolutePath
+                                        selectedSkill = skill
+                                        selectedSkillDetail = null
+                                        isSkillDetailLoading = true
+                                        scope.launch {
+                                            val detail =
+                                                withContext(Dispatchers.IO) {
+                                                    buildSkillDetailDialogData(
+                                                        skill = skill,
+                                                        skillContent = skillRepository.readSkillContent(skill.name).orEmpty()
+                                                    )
+                                                }
+                                            if (selectedSkill?.directory?.absolutePath == targetPath) {
+                                                selectedSkillDetail = detail
+                                                isSkillDetailLoading = false
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.longPressDraggableHandle()
+                                )
+                            }
+                            if (index < orderedSkills.lastIndex) {
+                                HorizontalDivider(
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1005,7 +1069,8 @@ private fun SkillLoadErrorsDialog(
 private fun SkillListItem(
     skill: SkillPackage,
     skillVisibilityPreferences: SkillVisibilityPreferences,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val accentColor = MaterialTheme.colorScheme.primary
     var visibleToAi by remember(skill.name) {
@@ -1014,7 +1079,7 @@ private fun SkillListItem(
 
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp

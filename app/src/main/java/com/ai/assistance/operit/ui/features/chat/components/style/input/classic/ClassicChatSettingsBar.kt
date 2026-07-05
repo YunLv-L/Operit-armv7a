@@ -121,6 +121,8 @@ fun ClassicChatSettingsBar(
     onToggleTools: () -> Unit,
     toolPromptVisibility: Map<String, Boolean>,
     onSaveToolPromptVisibilityMap: (Map<String, Boolean>) -> Unit,
+    toolOrder: List<String> = emptyList(),
+    onSaveToolOrder: (List<String>) -> Unit = {},
     disableStreamOutput: Boolean,
     onToggleDisableStreamOutput: () -> Unit,
     disableUserPreferenceDescription: Boolean,
@@ -720,7 +722,9 @@ fun ClassicChatSettingsBar(
         ToolPromptManagerDialog(
             visible = showToolPromptManagerDialog,
             toolPromptVisibility = toolPromptVisibility,
+            toolOrder = toolOrder,
             onSaveToolPromptVisibilityMap = onSaveToolPromptVisibilityMap,
+            onSaveToolOrder = onSaveToolOrder,
             onDismissRequest = { showToolPromptManagerDialog = false },
             onManagePackagesClick = {
                 showToolPromptManagerDialog = false

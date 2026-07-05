@@ -127,6 +127,9 @@ class ApiConfigDelegate(
     private val _toolPromptVisibility = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val toolPromptVisibility: StateFlow<Map<String, Boolean>> = _toolPromptVisibility.asStateFlow()
 
+    private val _toolPromptOrder = MutableStateFlow<List<String>>(emptyList())
+    val toolPromptOrder: StateFlow<List<String>> = _toolPromptOrder.asStateFlow()
+
     private val _disableStreamOutput = MutableStateFlow(ApiPreferences.DEFAULT_DISABLE_STREAM_OUTPUT)
     val disableStreamOutput: StateFlow<Boolean> = _disableStreamOutput.asStateFlow()
 
@@ -431,6 +434,13 @@ class ApiConfigDelegate(
             }
         }
 
+        // Collect tool prompt order setting
+        configScope.launch {
+            apiPreferences.toolPromptOrderFlow.collect { order ->
+                _toolPromptOrder.value = order
+            }
+        }
+
         // Collect disable stream output setting
         configScope.launch {
             apiPreferences.disableStreamOutputFlow.collect { disabled ->
@@ -705,6 +715,13 @@ class ApiConfigDelegate(
         configScope.launch {
             apiPreferences.saveToolPromptVisibilityMap(visibilityMap)
             _toolPromptVisibility.value = visibilityMap
+        }
+    }
+
+    fun saveToolPromptOrder(order: List<String>) {
+        configScope.launch {
+            apiPreferences.saveToolPromptOrder(order)
+            _toolPromptOrder.value = order
         }
     }
 }

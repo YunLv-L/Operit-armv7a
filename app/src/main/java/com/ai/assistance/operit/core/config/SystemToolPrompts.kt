@@ -645,6 +645,20 @@ object SystemToolPrompts {
         val description: String
     )
 
+    private fun applyToolOrder(
+        categories: List<SystemToolPromptCategory>,
+        toolOrder: List<String>
+    ): List<SystemToolPromptCategory> {
+        if (toolOrder.isEmpty()) return categories
+        val orderIndex = toolOrder.withIndex().associate { (index, name) -> name to index }
+        return categories.map { category ->
+            val sortedTools = category.tools.sortedBy { tool ->
+                orderIndex[tool.name] ?: Int.MAX_VALUE
+            }
+            category.copy(tools = sortedTools)
+        }
+    }
+
     private fun applyToolVisibility(
         categories: List<SystemToolPromptCategory>,
         toolVisibility: Map<String, Boolean>
@@ -662,14 +676,17 @@ object SystemToolPrompts {
         }
     }
 
-    fun getManageableToolPrompts(useEnglish: Boolean): List<ManageableToolPrompt> {
+    fun getManageableToolPrompts(
+        useEnglish: Boolean,
+        toolOrder: List<String> = emptyList()
+    ): List<ManageableToolPrompt> {
         val baseCategories = if (useEnglish) {
             listOf(basicTools, fileSystemTools, httpTools, memoryTools)
         } else {
             listOf(basicToolsCn, fileSystemToolsCn, httpToolsCn, memoryToolsCn)
         }
 
-        return baseCategories
+        val result = baseCategories
             .flatMap { category ->
                 category.tools.map { tool ->
                     ManageableToolPrompt(
@@ -680,6 +697,15 @@ object SystemToolPrompts {
                 }
             }
             .distinctBy { it.name }
+
+        return if (toolOrder.isNotEmpty()) {
+            val orderIndex = toolOrder.withIndex().associate { (index, name) -> name to index }
+            result.sortedBy { manageable ->
+                orderIndex[manageable.name] ?: Int.MAX_VALUE
+            }
+        } else {
+            result
+        }
     }
 
     fun generateMemoryToolsPromptEn(
@@ -811,6 +837,7 @@ object SystemToolPrompts {
         chatModelHasDirectVideo: Boolean = false,
         safBookmarkNames: List<String> = emptyList(),
         toolVisibility: Map<String, Boolean> = emptyMap(),
+        toolOrder: List<String> = emptyList(),
         hookMetadata: Map<String, Any?> = emptyMap(),
         dispatchToolPromptComposeHooks: (PromptHookContext) -> PromptHookContext = PromptHookRegistry::dispatchToolPromptComposeHooks
     ): String {
@@ -836,7 +863,8 @@ object SystemToolPrompts {
             )
                 .filter { it.categoryName != "Memory and Memory Library Tools" }
         }
-        val visibleCategories = applyToolVisibility(categories, toolVisibility)
+        val orderedCategories = applyToolOrder(categories, toolOrder)
+        val visibleCategories = applyToolVisibility(orderedCategories, toolVisibility)
         val availableTools = buildToolHookPayload(visibleCategories)
         val beforeContext =
             dispatchToolPromptComposeHooks(
@@ -855,7 +883,8 @@ object SystemToolPrompts {
                             "chatModelHasDirectAudio" to chatModelHasDirectAudio,
                             "chatModelHasDirectVideo" to chatModelHasDirectVideo,
                             "safBookmarkNames" to safBookmarkNames,
-                            "toolVisibility" to toolVisibility
+                            "toolVisibility" to toolVisibility,
+                            "toolOrder" to toolOrder
                         ) + hookMetadata
                 )
             )
@@ -899,6 +928,7 @@ object SystemToolPrompts {
         chatModelHasDirectVideo: Boolean = false,
         safBookmarkNames: List<String> = emptyList(),
         toolVisibility: Map<String, Boolean> = emptyMap(),
+        toolOrder: List<String> = emptyList(),
         hookMetadata: Map<String, Any?> = emptyMap(),
         dispatchToolPromptComposeHooks: (PromptHookContext) -> PromptHookContext = PromptHookRegistry::dispatchToolPromptComposeHooks
     ): String {
@@ -924,7 +954,8 @@ object SystemToolPrompts {
             )
                 .filter { it.categoryName != "记忆与记忆库工具" }
         }
-        val visibleCategories = applyToolVisibility(categories, toolVisibility)
+        val orderedCategories = applyToolOrder(categories, toolOrder)
+        val visibleCategories = applyToolVisibility(orderedCategories, toolVisibility)
         val availableTools = buildToolHookPayload(visibleCategories)
         val beforeContext =
             dispatchToolPromptComposeHooks(
@@ -943,7 +974,8 @@ object SystemToolPrompts {
                             "chatModelHasDirectAudio" to chatModelHasDirectAudio,
                             "chatModelHasDirectVideo" to chatModelHasDirectVideo,
                             "safBookmarkNames" to safBookmarkNames,
-                            "toolVisibility" to toolVisibility
+                            "toolVisibility" to toolVisibility,
+                            "toolOrder" to toolOrder
                         ) + hookMetadata
                 )
             )

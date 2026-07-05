@@ -148,6 +148,15 @@ class ApiPreferences private constructor(private val context: Context) {
         // Key for per-tool prompt visibility
         val TOOL_PROMPT_VISIBILITY_JSON = stringPreferencesKey("tool_prompt_visibility_json")
 
+        // Key for per-tool prompt order (list of tool names)
+        val TOOL_PROMPT_ORDER_JSON = stringPreferencesKey("tool_prompt_order_json")
+
+        // Key for plugin order (list of package names)
+        val PLUGIN_ORDER_JSON = stringPreferencesKey("plugin_order_json")
+
+        // Key for skill order (list of skill names)
+        val SKILL_ORDER_JSON = stringPreferencesKey("skill_order_json")
+
         // Key for Disable Stream Output
         val DISABLE_STREAM_OUTPUT = booleanPreferencesKey("disable_stream_output")
 
@@ -193,6 +202,7 @@ class ApiPreferences private constructor(private val context: Context) {
         // 默认空的自定义参数列表
         const val DEFAULT_CUSTOM_PARAMETERS = "[]"
         const val DEFAULT_TOOL_PROMPT_VISIBILITY_JSON = "{}"
+        const val DEFAULT_TOOL_PROMPT_ORDER_JSON = "[]"
         const val DEFAULT_FEATURE_TOGGLES_JSON = "{}"
 
         // API 配置默认值
@@ -298,6 +308,33 @@ class ApiPreferences private constructor(private val context: Context) {
             runCatching {
                 Json.decodeFromString<Map<String, Boolean>>(json)
             }.getOrElse { emptyMap() }
+        }
+
+    // Flow for per-tool prompt order
+    val toolPromptOrderFlow: Flow<List<String>> =
+        context.apiDataStore.data.map { preferences ->
+            val json = preferences[TOOL_PROMPT_ORDER_JSON] ?: DEFAULT_TOOL_PROMPT_ORDER_JSON
+            runCatching {
+                Json.decodeFromString<List<String>>(json)
+            }.getOrElse { emptyList() }
+        }
+
+    // Flow for plugin order
+    val pluginOrderFlow: Flow<List<String>> =
+        context.apiDataStore.data.map { preferences ->
+            val json = preferences[PLUGIN_ORDER_JSON] ?: DEFAULT_TOOL_PROMPT_ORDER_JSON
+            runCatching {
+                Json.decodeFromString<List<String>>(json)
+            }.getOrElse { emptyList() }
+        }
+
+    // Flow for skill order
+    val skillOrderFlow: Flow<List<String>> =
+        context.apiDataStore.data.map { preferences ->
+            val json = preferences[SKILL_ORDER_JSON] ?: DEFAULT_TOOL_PROMPT_ORDER_JSON
+            runCatching {
+                Json.decodeFromString<List<String>>(json)
+            }.getOrElse { emptyList() }
         }
 
     // Flow for Disable Stream Output
@@ -410,6 +447,51 @@ class ApiPreferences private constructor(private val context: Context) {
         return runCatching {
             Json.decodeFromString<Map<String, Boolean>>(json)
         }.getOrElse { emptyMap() }
+    }
+
+    // Save tool prompt order (list of tool names)
+    suspend fun saveToolPromptOrder(order: List<String>) {
+        context.apiDataStore.edit { preferences ->
+            preferences[TOOL_PROMPT_ORDER_JSON] = Json.encodeToString(order)
+        }
+    }
+
+    suspend fun getToolPromptOrder(): List<String> {
+        val preferences = context.apiDataStore.data.first()
+        val json = preferences[TOOL_PROMPT_ORDER_JSON] ?: DEFAULT_TOOL_PROMPT_ORDER_JSON
+        return runCatching {
+            Json.decodeFromString<List<String>>(json)
+        }.getOrElse { emptyList() }
+    }
+
+    // Save plugin order (list of package names)
+    suspend fun savePluginOrder(order: List<String>) {
+        context.apiDataStore.edit { preferences ->
+            preferences[PLUGIN_ORDER_JSON] = Json.encodeToString(order)
+        }
+    }
+
+    suspend fun getPluginOrder(): List<String> {
+        val preferences = context.apiDataStore.data.first()
+        val json = preferences[PLUGIN_ORDER_JSON] ?: DEFAULT_TOOL_PROMPT_ORDER_JSON
+        return runCatching {
+            Json.decodeFromString<List<String>>(json)
+        }.getOrElse { emptyList() }
+    }
+
+    // Save skill order (list of skill names)
+    suspend fun saveSkillOrder(order: List<String>) {
+        context.apiDataStore.edit { preferences ->
+            preferences[SKILL_ORDER_JSON] = Json.encodeToString(order)
+        }
+    }
+
+    suspend fun getSkillOrder(): List<String> {
+        val preferences = context.apiDataStore.data.first()
+        val json = preferences[SKILL_ORDER_JSON] ?: DEFAULT_TOOL_PROMPT_ORDER_JSON
+        return runCatching {
+            Json.decodeFromString<List<String>>(json)
+        }.getOrElse { emptyList() }
     }
 
     // Save Disable Stream Output setting

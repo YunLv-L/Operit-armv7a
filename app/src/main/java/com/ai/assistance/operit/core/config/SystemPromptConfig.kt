@@ -78,7 +78,7 @@ PACKAGE SYSTEM
   - tool_name 填写真实工具名（例如 packageName:toolName）
   - 将目标工具参数放入 params（JSON对象）"""
 
-    private fun getAvailableToolsEn(
+    private suspend fun getAvailableToolsEn(
         chatId: String?,
         hasImageRecognition: Boolean,
         chatModelHasDirectImage: Boolean,
@@ -89,8 +89,14 @@ PACKAGE SYSTEM
         safBookmarkNames: List<String>,
         toolVisibility: Map<String, Boolean>,
         hookMetadata: Map<String, Any?> = emptyMap(),
-        dispatchToolPromptComposeHooks: (PromptHookContext) -> PromptHookContext = PromptHookRegistry::dispatchToolPromptComposeHooks
+        dispatchToolPromptComposeHooks: (PromptHookContext) -> PromptHookContext = PromptHookRegistry::dispatchToolPromptComposeHooks,
+        context: Context? = null
     ): String {
+        val toolOrder = if (context != null) {
+            ApiPreferences.getInstance(context).getToolPromptOrder()
+        } else {
+            emptyList()
+        }
         return SystemToolPrompts.generateToolsPromptEn(
             chatId = chatId,
             hasBackendImageRecognition = hasImageRecognition,
@@ -102,6 +108,7 @@ PACKAGE SYSTEM
             chatModelHasDirectVideo = chatModelHasDirectVideo,
             safBookmarkNames = safBookmarkNames,
             toolVisibility = toolVisibility,
+            toolOrder = toolOrder,
             hookMetadata = hookMetadata,
             dispatchToolPromptComposeHooks = dispatchToolPromptComposeHooks
         )
@@ -111,7 +118,7 @@ PACKAGE SYSTEM
         return SystemToolPrompts.generateMemoryToolsPromptEn(toolVisibility)
     }
 
-    private fun getAvailableToolsCn(
+    private suspend fun getAvailableToolsCn(
         chatId: String?,
         hasImageRecognition: Boolean,
         chatModelHasDirectImage: Boolean,
@@ -122,8 +129,14 @@ PACKAGE SYSTEM
         safBookmarkNames: List<String>,
         toolVisibility: Map<String, Boolean>,
         hookMetadata: Map<String, Any?> = emptyMap(),
-        dispatchToolPromptComposeHooks: (PromptHookContext) -> PromptHookContext = PromptHookRegistry::dispatchToolPromptComposeHooks
+        dispatchToolPromptComposeHooks: (PromptHookContext) -> PromptHookContext = PromptHookRegistry::dispatchToolPromptComposeHooks,
+        context: Context? = null
     ): String {
+        val toolOrder = if (context != null) {
+            ApiPreferences.getInstance(context).getToolPromptOrder()
+        } else {
+            emptyList()
+        }
         return SystemToolPrompts.generateToolsPromptCn(
             chatId = chatId,
             hasBackendImageRecognition = hasImageRecognition,
@@ -135,6 +148,7 @@ PACKAGE SYSTEM
             chatModelHasDirectVideo = chatModelHasDirectVideo,
             safBookmarkNames = safBookmarkNames,
             toolVisibility = toolVisibility,
+            toolOrder = toolOrder,
             hookMetadata = hookMetadata,
             dispatchToolPromptComposeHooks = dispatchToolPromptComposeHooks
         )
@@ -383,7 +397,8 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
                 safBookmarkNames = safBookmarkNames,
                 toolVisibility = toolVisibility,
                 hookMetadata = hookMetadata,
-                dispatchToolPromptComposeHooks = dispatchToolPromptComposeHooks
+                dispatchToolPromptComposeHooks = dispatchToolPromptComposeHooks,
+                context = context
             )
     )
     val availableToolsCn = if (useToolCallApi || toolExposureMode == ToolExposureMode.CLI) "" else (
@@ -399,7 +414,8 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
                 safBookmarkNames = safBookmarkNames,
                 toolVisibility = toolVisibility,
                 hookMetadata = hookMetadata,
-                dispatchToolPromptComposeHooks = dispatchToolPromptComposeHooks
+                dispatchToolPromptComposeHooks = dispatchToolPromptComposeHooks,
+                context = context
             )
     )
 

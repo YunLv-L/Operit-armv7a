@@ -315,6 +315,7 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
     val enableMaxContextMode by actualViewModel.enableMaxContextMode.collectAsState()
     val enableTools by actualViewModel.enableTools.collectAsState()
     val toolPromptVisibility by actualViewModel.toolPromptVisibility.collectAsState()
+    val toolPromptOrder by actualViewModel.toolPromptOrder.collectAsState()
     val disableStreamOutput by actualViewModel.disableStreamOutput.collectAsState()
     val disableUserPreferenceDescription by
             actualViewModel.disableUserPreferenceDescription.collectAsState()
@@ -1107,6 +1108,10 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
                                     onSaveToolPromptVisibilityMap = { visibilityMap ->
                                         actualViewModel.saveToolPromptVisibilityMap(visibilityMap)
                                     },
+                                    toolOrder = toolPromptOrder,
+                                    onSaveToolOrder = { order ->
+                                        actualViewModel.saveToolPromptOrder(order)
+                                    },
                                     disableStreamOutput = disableStreamOutput,
                                     onToggleDisableStreamOutput = {
                                         actualViewModel.toggleDisableStreamOutput()
@@ -1163,6 +1168,10 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
                                 onNavigateToUserPreferences = onNavigateToUserPreferences,
                                 onNavigateToPackageManager = onNavigateToPackageManager,
                                 toolPromptVisibility = toolPromptVisibility,
+                                toolPromptOrder = toolPromptOrder,
+                                onSaveToolOrder = { order ->
+                                    actualViewModel.saveToolPromptOrder(order)
+                                },
                                 onNavigateToModelConfig = onNavigateToModelConfig,
                                 characterCardBoundChatModelConfigId =
                                         characterCardBoundChatModelConfigId,
@@ -1553,6 +1562,8 @@ private fun ChatInputBottomBar(
     onNavigateToUserPreferences: () -> Unit,
     onNavigateToPackageManager: () -> Unit,
     toolPromptVisibility: Map<String, Boolean>,
+    toolPromptOrder: List<String> = emptyList(),
+    onSaveToolOrder: (List<String>) -> Unit = {},
     onNavigateToModelConfig: () -> Unit,
     characterCardBoundChatModelConfigId: String?,
     characterCardBoundChatModelIndex: Int,
@@ -1941,6 +1952,8 @@ private fun ChatInputBottomBar(
                 onNavigateToPackageManager = onNavigateToPackageManager,
                 toolPromptVisibility = toolPromptVisibility,
                 onSaveToolPromptVisibilityMap = actualViewModel::saveToolPromptVisibilityMap,
+                toolOrder = toolPromptOrder,
+                onSaveToolOrder = actualViewModel::saveToolPromptOrder,
                 onManualMemoryUpdate = actualViewModel::manuallyUpdateMemory,
                 onNavigateToModelConfig = onNavigateToModelConfig,
                 characterCardBoundChatModelConfigId = characterCardBoundChatModelConfigId,
