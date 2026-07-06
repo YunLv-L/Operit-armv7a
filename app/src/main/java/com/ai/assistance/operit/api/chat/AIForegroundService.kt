@@ -1498,6 +1498,7 @@ class AIForegroundService : Service() {
                     gravity = Gravity.TOP or Gravity.START
                     x = 0
                     y = 0
+                    alpha = 0f
                 }
 
                 wm.addView(view, params)

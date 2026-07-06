@@ -325,12 +325,14 @@ open class AccessibilityUITools(context: Context) : StandardUITools(context) {
             val centerX = rect.centerX()
             val centerY = rect.centerY()
 
-            operationOverlay.showTap(centerX, centerY)
+            withContext(Dispatchers.Main) { operationOverlay.hideImmediately() }
             val clickSuccess = performAccessibilityClick(centerX, centerY)
 
             return if (clickSuccess) {
-                // 成功后也主动隐藏overlay，不等待自动清理
-                operationOverlay.hide()
+                withContext(Dispatchers.Main) {
+                    operationOverlay.showTap(centerX, centerY)
+                    operationOverlay.hide()
+                }
                 ToolResult(
                         toolName = tool.name,
                         success = true,
@@ -452,15 +454,16 @@ open class AccessibilityUITools(context: Context) : StandardUITools(context) {
             )
         }
 
-            // 显示点击反馈
-            operationOverlay.showTap(x, y)
+            withContext(Dispatchers.Main) { operationOverlay.hideImmediately() }
 
             // 使用无障碍服务执行点击
             val result = performAccessibilityClick(x, y)
 
                 if (result) {
-                // 成功后主动隐藏overlay
-                operationOverlay.hide()
+                withContext(Dispatchers.Main) {
+                    operationOverlay.showTap(x, y)
+                    operationOverlay.hide()
+                }
                 ToolResult(
                         toolName = tool.name,
                         success = true,
@@ -511,15 +514,16 @@ open class AccessibilityUITools(context: Context) : StandardUITools(context) {
             )
         }
 
-            // 显示长按反馈（复用点击效果）
-            operationOverlay.showTap(x, y)
+            withContext(Dispatchers.Main) { operationOverlay.hideImmediately() }
 
             // 使用无障碍服务执行长按
             val result = performAccessibilityLongPress(x, y)
 
                 if (result) {
-                // 成功后主动隐藏overlay
-                operationOverlay.hide()
+                withContext(Dispatchers.Main) {
+                    operationOverlay.showTap(x, y)
+                    operationOverlay.hide()
+                }
                 ToolResult(
                         toolName = tool.name,
                         success = true,
@@ -573,15 +577,16 @@ open class AccessibilityUITools(context: Context) : StandardUITools(context) {
             )
         }
 
-            // 显示滑动反馈
-            operationOverlay.showSwipe(startX, startY, endX, endY)
+            withContext(Dispatchers.Main) { operationOverlay.hideImmediately() }
 
             // 使用无障碍服务执行滑动
             val result = performAccessibilitySwipe(startX, startY, endX, endY, duration)
 
                 if (result) {
-                // 成功后主动隐藏overlay
-                operationOverlay.hide()
+                withContext(Dispatchers.Main) {
+                    operationOverlay.showSwipe(startX, startY, endX, endY)
+                    operationOverlay.hide()
+                }
                 ToolResult(
                         toolName = tool.name,
                         success = true,

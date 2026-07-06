@@ -71,9 +71,7 @@ open class DebuggerUITools(context: Context) : AccessibilityUITools(context) {
                             "Missing or invalid coordinates. Both 'x' and 'y' must be valid integers."
             )
         }
-
-        // 显示点击反馈（在主线程上执行）
-        withContext(Dispatchers.Main) { operationOverlay.showTap(x, y) }
+        withContext(Dispatchers.Main) { operationOverlay.hideImmediately() }
 
         // 使用Shell命令执行点击
         try {
@@ -83,8 +81,10 @@ open class DebuggerUITools(context: Context) : AccessibilityUITools(context) {
 
             if (result.success) {
                 AppLogger.d(TAG, "Tap successful at coordinates: ($x, $y)")
-                // 成功后主动隐藏overlay
-                withContext(Dispatchers.Main) { operationOverlay.hide() }
+                withContext(Dispatchers.Main) {
+                    operationOverlay.showTap(x, y)
+                    operationOverlay.hide()
+                }
                 return ToolResult(
                         toolName = tool.name,
                         success = true,
@@ -141,8 +141,7 @@ open class DebuggerUITools(context: Context) : AccessibilityUITools(context) {
                     error = "Missing or invalid coordinates. Both 'x' and 'y' must be valid integers."
             )
         }
-
-        withContext(Dispatchers.Main) { operationOverlay.showTap(x, y) }
+        withContext(Dispatchers.Main) { operationOverlay.hideImmediately() }
 
         try {
             AppLogger.d(TAG, "Attempting to long press at coordinates: ($x, $y) via shell command")
@@ -152,7 +151,10 @@ open class DebuggerUITools(context: Context) : AccessibilityUITools(context) {
 
             if (result.success) {
                 AppLogger.d(TAG, "Long press successful at coordinates: ($x, $y)")
-                withContext(Dispatchers.Main) { operationOverlay.hide() }
+                withContext(Dispatchers.Main) {
+                    operationOverlay.showTap(x, y)
+                    operationOverlay.hide()
+                }
                 return ToolResult(
                         toolName = tool.name,
                         success = true,
@@ -207,9 +209,7 @@ open class DebuggerUITools(context: Context) : AccessibilityUITools(context) {
                             "Missing or invalid coordinates. 'start_x', 'start_y', 'end_x', and 'end_y' must be valid integers."
             )
         }
-
-        // 显示滑动反馈（在主线程上执行）
-        withContext(Dispatchers.Main) { operationOverlay.showSwipe(startX, startY, endX, endY) }
+        withContext(Dispatchers.Main) { operationOverlay.hideImmediately() }
 
         try {
             AppLogger.d(
@@ -221,8 +221,10 @@ open class DebuggerUITools(context: Context) : AccessibilityUITools(context) {
 
             if (result.success) {
                 AppLogger.d(TAG, "Swipe successful from ($startX, $startY) to ($endX, $endY)")
-                // 成功后主动隐藏overlay
-                withContext(Dispatchers.Main) { operationOverlay.hide() }
+                withContext(Dispatchers.Main) {
+                    operationOverlay.showSwipe(startX, startY, endX, endY)
+                    operationOverlay.hide()
+                }
                 return ToolResult(
                         toolName = tool.name,
                         success = true,
@@ -1254,8 +1256,7 @@ open class DebuggerUITools(context: Context) : AccessibilityUITools(context) {
             val centerX = (x1 + x2) / 2
             val centerY = (y1 + y2) / 2
 
-            // 执行点击（在主线程上显示反馈）
-            withContext(Dispatchers.Main) { operationOverlay.showTap(centerX, centerY) }
+            withContext(Dispatchers.Main) { operationOverlay.hideImmediately() }
 
             val tapCommand = "input tap $centerX $centerY"
             val tapResult = executeUiShellCommand(tapCommand)
@@ -1273,8 +1274,10 @@ open class DebuggerUITools(context: Context) : AccessibilityUITools(context) {
                             " (index $index of ${matchingNodes.size} matches)"
                         } else ""
 
-                // 成功后主动隐藏overlay
-                withContext(Dispatchers.Main) { operationOverlay.hide() }
+                withContext(Dispatchers.Main) {
+                    operationOverlay.showTap(centerX, centerY)
+                    operationOverlay.hide()
+                }
                 return ToolResult(
                         toolName = tool.name,
                         success = true,

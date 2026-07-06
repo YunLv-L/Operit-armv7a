@@ -52,7 +52,7 @@ open class RootUITools(context: Context) : AdminUITools(context) {
         }
 
         val overlay = operationOverlay
-        withContext(Dispatchers.Main) { overlay.showTap(x, y) }
+        withContext(Dispatchers.Main) { overlay.hideImmediately() }
 
         try {
             AppLogger.d(TAG, "Attempting to tap at coordinates: ($x, $y) via shell command")
@@ -61,8 +61,10 @@ open class RootUITools(context: Context) : AdminUITools(context) {
 
             return if (result.success) {
                 AppLogger.d(TAG, "Tap successful at coordinates: ($x, $y)")
-                // 成功后主动隐藏overlay
-                withContext(Dispatchers.Main) { overlay.hide() }
+                withContext(Dispatchers.Main) {
+                    overlay.showTap(x, y)
+                    overlay.hide()
+                }
                 ToolResult(
                         toolName = tool.name,
                         success = true,
@@ -109,7 +111,7 @@ open class RootUITools(context: Context) : AdminUITools(context) {
         }
 
         val overlay = operationOverlay
-        withContext(Dispatchers.Main) { overlay.showTap(x, y) }
+        withContext(Dispatchers.Main) { overlay.hideImmediately() }
 
         val durationMs = 800
 
@@ -120,7 +122,10 @@ open class RootUITools(context: Context) : AdminUITools(context) {
 
             return if (result.success) {
                 AppLogger.d(TAG, "Long press successful at coordinates: ($x, $y)")
-                withContext(Dispatchers.Main) { overlay.hide() }
+                withContext(Dispatchers.Main) {
+                    overlay.showTap(x, y)
+                    overlay.hide()
+                }
                 ToolResult(
                         toolName = tool.name,
                         success = true,
@@ -172,7 +177,7 @@ open class RootUITools(context: Context) : AdminUITools(context) {
         }
 
         val overlay = operationOverlay
-        withContext(Dispatchers.Main) { overlay.showSwipe(startX, startY, endX, endY) }
+        withContext(Dispatchers.Main) { overlay.hideImmediately() }
 
         try {
             AppLogger.d(TAG, "Swiping from ($startX, $startY) to ($endX, $endY) via shell")
@@ -181,8 +186,10 @@ open class RootUITools(context: Context) : AdminUITools(context) {
 
             return if (result.success) {
                 AppLogger.d(TAG, "Swipe successful")
-                // 成功后主动隐藏overlay
-                withContext(Dispatchers.Main) { overlay.hide() }
+                withContext(Dispatchers.Main) {
+                    overlay.showSwipe(startX, startY, endX, endY)
+                    overlay.hide()
+                }
                 ToolResult(
                         toolName = tool.name,
                         success = true,
@@ -605,4 +612,3 @@ open class RootUITools(context: Context) : AdminUITools(context) {
         }
     }
 }
-

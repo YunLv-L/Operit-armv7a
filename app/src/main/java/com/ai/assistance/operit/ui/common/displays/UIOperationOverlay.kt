@@ -310,35 +310,48 @@ class UIOperationOverlay private constructor(private val context: Context) {
     fun hide() {
         runOnMainThread {
             handler.postDelayed({
-                try {
-                    // 清除所有待处理的移除任务
-                    handler.removeCallbacksAndMessages(null)
-                    // 清空所有事件列表
-                    tapEvents.clear()
-                    swipeEvents.clear()
-                    textInputEvents.clear()
-
-                    // 彻底移除视图
-                    if (overlayView != null) {
-                        lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-                        lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
-                        lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-
-                        try {
-                            windowManager?.removeView(overlayView)
-                        } catch (e: Exception) {
-                            AppLogger.e(TAG, "Error removing overlay view", e)
-                        }
-
-                        overlayView = null
-                        lifecycleOwner = null
-                        windowManager = null
-                        AppLogger.d(TAG, "Overlay view dismissed")
-                    }
-                } catch (e: Exception) {
-                    AppLogger.e(TAG, "Error dismissing overlay view", e)
-                }
+                dismissOverlayNow()
             }, HIDE_DELAY_MS)
+        }
+    }
+
+    /**
+     * 立即移除反馈悬浮窗，避免下一次注入点击/滑动时被旧反馈层遮挡。
+     */
+    fun hideImmediately() {
+        runOnMainThread {
+            dismissOverlayNow()
+        }
+    }
+
+    private fun dismissOverlayNow() {
+        try {
+            // 清除所有待处理的移除任务
+            handler.removeCallbacksAndMessages(null)
+            // 清空所有事件列表
+            tapEvents.clear()
+            swipeEvents.clear()
+            textInputEvents.clear()
+
+            // 彻底移除视图
+            if (overlayView != null) {
+                lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+                lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+                lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+
+                try {
+                    windowManager?.removeView(overlayView)
+                } catch (e: Exception) {
+                    AppLogger.e(TAG, "Error removing overlay view", e)
+                }
+
+                overlayView = null
+                lifecycleOwner = null
+                windowManager = null
+                AppLogger.d(TAG, "Overlay view dismissed")
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Error dismissing overlay view", e)
         }
     }
 }
@@ -600,4 +613,4 @@ private fun TextInputIndicator(
             )
         }
     }
-} 
+}
