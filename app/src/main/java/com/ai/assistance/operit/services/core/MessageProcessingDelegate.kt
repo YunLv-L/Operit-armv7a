@@ -61,6 +61,7 @@ class MessageProcessingDelegate(
         private val saveCurrentChat: suspend () -> Unit,
         private val showErrorMessage: (String) -> Unit,
         private val updateChatTitle: (chatId: String, title: String) -> Unit,
+        private val getChatTitle: (chatId: String) -> String?,
         private val onTurnComplete:
             suspend (chatId: String?, service: EnhancedAIService, nextWindowSize: Int?, turnOptions: ChatTurnOptions) -> Unit,
         private val onTokenLimitExceeded: suspend (
@@ -78,6 +79,36 @@ class MessageProcessingDelegate(
         private const val STREAM_SCROLL_THROTTLE_MS = 200L
         private const val STREAM_PERSIST_INTERVAL_MS = 1000L
         private const val AUTO_READ_PREVIEW_MAX = 48
+    }
+
+
+
+    private fun fallbackConversationTitle(userText: String, attachments: List<AttachmentInfo>): String {
+        return attachments.firstOrNull()?.fileName?.trim()?.takeIf { it.isNotBlank() }
+            ?: context.getString(R.string.new_conversation)
+    }
+
+    private fun launchConversationTitleGeneration(
+        chatId: String,
+        userText: String,
+        attachments: List<AttachmentInfo>,
+        fallbackTitle: String
+    ) {
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val generatedTitle = EnhancedAIService.getChatInstance(context, chatId)
+                    .generateConversationTitle(
+                        userText = userText,
+                        attachmentFileNames = attachments.map { it.fileName }
+                    )
+                    .trim()
+                if (generatedTitle.isNotBlank() && getChatTitle(chatId) == fallbackTitle) {
+                    updateChatTitle(chatId, generatedTitle)
+                }
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "生成对话标题失败", e)
+            }
+        }
     }
 
     private fun speechPreview(text: String): String {
@@ -611,14 +642,12 @@ class MessageProcessingDelegate(
             val effectiveHideUserMessage = effectivePersistTurn && turnOptions.hideUserMessage
             // 检查这是否是聊天中的第一条用户消息（忽略AI的开场白）
             val isFirstMessage = !hasUserMessage(chatId)
-            if (effectivePersistTurn && isFirstMessage && chatId != null) {
-                val newTitle =
-                    when {
-                        originalMessageText.isNotBlank() -> originalMessageText
-                        attachments.isNotEmpty() -> attachments.first().fileName
-                        else -> context.getString(R.string.new_conversation)
-                    }
-                updateChatTitle(chatId, newTitle)
+            val titleFallback = if (effectivePersistTurn && isFirstMessage && chatId != null) {
+                fallbackConversationTitle(originalMessageText, attachments).also { fallbackTitle ->
+                    updateChatTitle(chatId, fallbackTitle)
+                }
+            } else {
+                null
             }
 
             AppLogger.d(TAG, "开始处理用户消息：附件数量=${attachments.size}")
@@ -726,6 +755,14 @@ class MessageProcessingDelegate(
                     startTimeMs = addUserMessageStartTime,
                     details = "chatId=$chatId, contentLength=${userMessage.content.length}"
                 )
+                titleFallback?.let { fallbackTitle ->
+                    launchConversationTitleGeneration(
+                        chatId = chatId,
+                        userText = originalMessageText,
+                        attachments = attachments,
+                        fallbackTitle = fallbackTitle
+                    )
+                }
             }
 
             lateinit var aiMessage: ChatMessage

@@ -937,6 +937,7 @@
     
     <!-- Function Types -->
     <string name="function_type_chat">Función de Chat</string>
+    <string name="function_type_title_generation">Resumen de título con IA</string>
     <string name="function_type_summary">Resumen de Conversación</string>
     <string name="function_type_memory">Gestión de memoria</string>
     <string name="function_type_file_binding">Procesamiento de Vinculación de Archivos</string>
@@ -944,6 +945,7 @@
     
     <!-- Function Descriptions -->
     <string name="function_desc_chat">Función principal de chat para interacción diaria de conversación con usuarios</string>
+    <string name="function_desc_title_generation">Genera un título breve y preciso para la conversación a partir del primer mensaje del usuario.</string>
     <string name="function_desc_summary">Comprimir el contexto y generar resúmenes de chat</string>
     <string name="function_desc_memory">Procesar recuerdos y almacenarlos en la biblioteca de memoria</string>
     <string name="function_desc_file_binding">Procesa la vinculación inteligente y mezcla de contenido de archivos, proporcionando capacidades de procesamiento de código más precisas. Se recomienda usar modelos rápidos y económicos como Gemini Flash, no se recomienda usar DeepSeek R1</string>
@@ -5516,6 +5518,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="theme_avatar_description">Nota: El avatar del usuario a la izquierda es una configuración exclusiva de la tarjeta de personaje; si está vacío, se usará el avatar global del usuario a la derecha. El avatar global se comparte en todas las tarjetas de personaje.</string>
 
     <string name="functional_config_model_count">%1$d modelos</string>
+    <string name="functional_config_test_title_generation_user_text">Quiero planear un viaje de tres días a Tokio, incluyendo transporte, hoteles y recomendaciones de comida.</string>
     <string name="functional_config_test_grep_intent">Encuentra fragmentos que contengan saludos.</string>
     <string name="functional_config_test_grep_display_path">&lt;测试&gt;</string>
     <string name="functional_config_test_grep_candidates_digest">#1 [file: example.txt]\nHola mundo\n#2 [file: main.kt]\nfun main() {}</string>

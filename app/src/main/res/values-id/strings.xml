@@ -2775,6 +2775,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="functional_config_warning_audio_unsupported">Peringatan: Model yang dipilih saat ini tidak mengaktifkan "Dukungan Parsing Audio", pengenalan/transkripsi audio mungkin tidak tersedia. Silakan ganti dengan model yang mendukung input/transkripsi audio dan aktifkan "Model Mendukung Parsing Audio".</string>
     <string name="functional_config_warning_video_unsupported">Peringatan: Model yang dipilih saat ini tidak mengaktifkan "Dukungan Parsing Video", pemahaman video mungkin tidak tersedia. Silakan ganti dengan model yang mendukung input video/gambar dan aktifkan "Model Mendukung Parsing Video".</string>
     <string name="function_type_chat">Fungsi Percakapan</string>
+    <string name="function_type_title_generation">Ringkasan judul AI</string>
     <string name="function_type_summary">Ringkasan Konteks</string>
     <string name="function_type_memory">Pembaruan Memori</string>
     <string name="function_type_file_binding">Pemrosesan Pengikatan File</string>
@@ -2786,6 +2787,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="function_type_audio_recognition">Pengenalan Audio</string>
     <string name="function_type_video_recognition">Pengenalan Video</string>
     <string name="function_desc_chat">Fungsi percakapan utama, digunakan untuk interaksi percakapan sehari-hari dengan pengguna</string>
+    <string name="function_desc_title_generation">Membuat judul percakapan yang singkat dan akurat dari pesan pertama pengguna.</string>
     <string name="function_desc_summary">Kompresi konteks, menghasilkan ringkasan obrolan</string>
     <string name="function_desc_memory">Memproses memori dan menyimpannya ke dalam bank memori</string>
     <string name="function_desc_file_binding">Memproses pengikatan dan pencampuran konten file secara cerdas, menyediakan kemampuan pemrosesan kode yang lebih presisi. Disarankan menggunakan model cepat dan murah seperti Gemini Flash, tidak disarankan menggunakan DeepSeek R1</string>
@@ -5575,6 +5577,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="theme_font_cursive">Cursive</string>
     <string name="theme_avatar_description">Keterangan: Avatar pengguna di sebelah kiri adalah pengaturan khusus kartu karakter. Jika kosong, akan menggunakan avatar pengguna global di sebelah kanan. Avatar pengguna global digunakan bersama di semua kartu karakter.</string>
     <string name="functional_config_model_count">%1$d model</string>
+    <string name="functional_config_test_title_generation_user_text">Saya ingin merencanakan perjalanan tiga hari ke Tokyo, termasuk transportasi, hotel, dan rekomendasi makanan.</string>
     <string name="functional_config_test_grep_intent">Temukan potongan yang berisi sapaan.</string>
     <string name="functional_config_test_grep_display_path">&lt;测试&gt;</string>
     <string name="functional_config_test_grep_candidates_digest">#1 [file: example.txt]\nHalo dunia\n#2 [file: main.kt]\nfun main() {}</string>

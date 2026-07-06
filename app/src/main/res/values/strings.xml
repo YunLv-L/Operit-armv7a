@@ -2894,6 +2894,7 @@
     <string name="functional_config_warning_audio_unsupported">警告：当前所选模型未启用“支持音频解析”，音频识别/转写可能不可用。请更换支持音频输入/转写的模型并开启“模型支持音频解析”。</string>
     <string name="functional_config_warning_video_unsupported">警告：当前所选模型未启用“支持视频解析”，视频理解可能不可用。请更换支持视频/图像输入的模型并开启“模型支持视频解析”。</string>
     <string name="function_type_chat">对话功能</string>
+    <string name="function_type_title_generation">AI总结标题</string>
     <string name="function_type_summary">上下文总结</string>
     <string name="function_type_memory">记忆更新</string>
     <string name="function_type_file_binding">文件绑定处理</string>
@@ -2907,6 +2908,7 @@
     
     <!-- Function Descriptions -->
     <string name="function_desc_chat">主要的对话功能，用于与用户进行日常对话交互</string>
+    <string name="function_desc_title_generation">根据用户第一条消息自动生成简短、准确的对话标题</string>
     <string name="function_desc_summary">压缩上下文，生成聊天摘要</string>
     <string name="function_desc_memory">处理记忆并存放到记忆库</string>
     <string name="function_desc_file_binding">处理文件内容的智能绑定与混合，提供更精确的代码处理能力。建议使用快速的廉价模型如Gemini Flash，不建议使用DeepSeek R1</string>
@@ -6420,6 +6422,7 @@
     <string name="theme_font_cursive">手写体 (Cursive)</string>
     <string name="theme_avatar_description">说明：左侧的用户头像是角色卡专属设置，为空时将使用右侧的全局用户头像。全局用户头像在所有角色卡中共享使用。</string>
     <string name="functional_config_model_count">%1$d个模型</string>
+    <string name="functional_config_test_title_generation_user_text">我想规划一次三天的东京旅行，包括交通、住宿和美食推荐。</string>
     <string name="functional_config_test_grep_intent">找到包含问候语的片段。</string>
     <string name="functional_config_test_grep_display_path">&lt;测试&gt;</string>
     <string name="functional_config_test_grep_candidates_digest">#1 [file: example.txt]\n你好世界\n#2 [file: main.kt]\nfun main() {}</string>

@@ -491,6 +491,12 @@ fun FunctionConfigCard(
                                                         )
                                                     enhancedService.generateSummary(sampleMessages)
                                                 }
+                                                FunctionType.TITLE_GENERATION -> {
+                                                    val enhancedService = EnhancedAIService.getInstance(context)
+                                                    enhancedService.generateConversationTitle(
+                                                        userText = context.getString(R.string.functional_config_test_title_generation_user_text)
+                                                    )
+                                                }
                                                 FunctionType.TRANSLATION -> {
                                                     val enhancedService = EnhancedAIService.getInstance(context)
                                                     enhancedService.translateText("Connection test: translate me.")
@@ -917,6 +923,7 @@ fun getFunctionDisplayName(functionType: FunctionType): String {
     return when (functionType) {
         FunctionType.CHAT -> stringResource(id = R.string.function_type_chat)
         FunctionType.SUMMARY -> stringResource(id = R.string.function_type_summary)
+        FunctionType.TITLE_GENERATION -> stringResource(id = R.string.function_type_title_generation)
         FunctionType.MEMORY -> stringResource(id = R.string.function_type_memory)
         FunctionType.UI_CONTROLLER -> stringResource(id = R.string.function_type_ui_controller)
         FunctionType.TRANSLATION -> stringResource(id = R.string.function_type_translation)
@@ -934,6 +941,7 @@ fun getFunctionDescription(functionType: FunctionType): String {
     return  when (functionType) {
         FunctionType.CHAT -> stringResource(id = R.string.function_desc_chat)
         FunctionType.SUMMARY -> stringResource(id = R.string.function_desc_summary)
+        FunctionType.TITLE_GENERATION -> stringResource(id = R.string.function_desc_title_generation)
         FunctionType.MEMORY -> stringResource(id = R.string.function_desc_memory)
         FunctionType.UI_CONTROLLER -> stringResource(id = R.string.function_desc_ui_controller)
         FunctionType.TRANSLATION -> stringResource(id = R.string.function_desc_translation)

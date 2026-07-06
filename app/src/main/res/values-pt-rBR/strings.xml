@@ -2498,6 +2498,7 @@ Agora é possível usar o modo AutoGLM na interface de diálogo.</string>
     <string name="functional_config_warning_audio_unsupported">Aviso: "Suporte à análise de áudio" não está habilitado para o modelo atualmente selecionado e o reconhecimento/tradução de áudio pode não estar disponível. Altere o modelo que suporta entrada/transcrição de áudio e ative "O modelo suporta análise de áudio".</string>
     <string name="functional_config_warning_video_unsupported">Aviso: "Suporte à análise de vídeo" não está habilitado para o modelo atualmente selecionado e a compreensão do vídeo pode não estar disponível. Altere o modelo que suporta entrada de vídeo/imagem e ative "O modelo suporta análise de vídeo".</string>
     <string name="function_type_chat">Função de conversa</string>
+    <string name="function_type_title_generation">Resumo de título por IA</string>
     <string name="function_type_summary">Resumo da conversa</string>
     <string name="function_type_memory">Gerenciamento de memória</string>
     <string name="function_type_file_binding">Processamento de vinculação de arquivo</string>
@@ -2509,6 +2510,7 @@ Agora é possível usar o modo AutoGLM na interface de diálogo.</string>
     <string name="function_type_audio_recognition">reconhecimento de áudio</string>
     <string name="function_type_video_recognition">reconhecimento de vídeo</string>
     <string name="function_desc_chat">Função de diálogo principal, usada para interação diária de diálogo com os usuários</string>
+    <string name="function_desc_title_generation">Gera um título de conversa curto e preciso a partir da primeira mensagem do usuário.</string>
     <string name="function_desc_summary">Compactar o contexto e gerar resumos de chat</string>
     <string name="function_desc_memory">Processar memórias e armazená-las na biblioteca de memória</string>
     <string name="function_desc_file_binding">Lide com vinculação e mistura inteligentes de conteúdo de arquivo para fornecer recursos de processamento de código mais precisos. Recomenda-se usar modelos rápidos e baratos como Gemini Flash, DeepSeek R1 não é recomendado</string>
@@ -5214,6 +5216,7 @@ Agora é possível usar o modo AutoGLM na interface de diálogo.</string>
     <string name="theme_font_cursive">Cursiva</string>
     <string name="theme_avatar_description">Observação: o avatar do usuário à esquerda é uma configuração específica do cartão de função. Se estiver vazio, será utilizado o avatar global do usuário à direita. O avatar global do usuário é compartilhado entre todos os cartões de personagem.</string>
     <string name="functional_config_model_count">%1$d modelos</string>
+    <string name="functional_config_test_title_generation_user_text">Quero planejar uma viagem de três dias para Tóquio, incluindo transporte, hotéis e recomendações de comida.</string>
     <string name="functional_config_test_grep_intent">Encontre o fragmento que contém a saudação.</string>
     <string name="functional_config_test_grep_display_path">&lt;Teste&gt;</string>
     <string name="functional_config_test_grep_candidates_digest">#1 [arquivo: exemplo.txt]\nOlá, mundo\n#2 [arquivo: main.kt]\nfun main() {}</string>

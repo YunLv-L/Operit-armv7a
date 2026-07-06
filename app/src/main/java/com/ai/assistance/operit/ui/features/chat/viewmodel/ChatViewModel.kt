@@ -1482,8 +1482,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         if (messageText.isBlank()) return
 
         val chatId = currentChatId.value ?: return
-        if (!chatHistoryDelegate.hasUserMessage(chatId)) {
-            chatHistoryDelegate.updateChatTitle(chatId, messageText)
+        val isFirstMessage = !chatHistoryDelegate.hasUserMessage(chatId)
+        val fallbackTitle = if (isFirstMessage) {
+            context.getString(R.string.new_conversation).also { chatHistoryDelegate.updateChatTitle(chatId, it) }
+        } else {
+            null
         }
         chatHistoryDelegate.addMessageToChat(
             ChatMessage(
@@ -1493,6 +1496,21 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             ),
             chatId
         )
+        fallbackTitle?.let { titleToPreserve ->
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val generatedTitle = EnhancedAIService.getChatInstance(context, chatId)
+                        .generateConversationTitle(userText = messageText)
+                        .trim()
+                    val currentTitle = chatHistoryDelegate.chatHistories.value.firstOrNull { it.id == chatId }?.title
+                    if (generatedTitle.isNotBlank() && currentTitle == titleToPreserve) {
+                        chatHistoryDelegate.updateChatTitle(chatId, generatedTitle)
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e(TAG, "生成可见用户消息对话标题失败", e)
+                }
+            }
+        }
     }
 
     private fun normalizeMentionDeletion(

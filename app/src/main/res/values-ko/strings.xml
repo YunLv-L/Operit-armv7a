@@ -2595,6 +2595,7 @@
     <string name="functional_config_warning_audio_unsupported">경고: 선택한 모델에 "오디오 지원"이 표시되어 있지 않아 오디오 인식/전사가 작동하지 않을 수 있습니다. 오디오를 지원하는 모델로 전환하고 "오디오를 지원하는 모델"을 활성화하세요.</string>
     <string name="functional_config_warning_video_unsupported">경고: 선택한 모델에 "동영상 지원"이 표시되어 있지 않아 동영상 이해가 작동하지 않을 수 있습니다. 동영상을 지원하는 모델로 전환하고 "동영상을 지원하는 모델"을 활성화하세요.</string>
     <string name="function_type_chat">채팅 기능</string>
+    <string name="function_type_title_generation">AI 제목 요약</string>
     <string name="function_type_summary">대화 요약</string>
     <string name="function_type_memory">메모리 관리</string>
     <string name="function_type_file_binding">파일 바인딩 처리</string>
@@ -2606,6 +2607,7 @@
     <string name="function_type_audio_recognition">오디오 인식</string>
     <string name="function_type_video_recognition">영상 인식</string>
     <string name="function_desc_chat">사용자와의 일상적인 대화를 위한 기본 채팅 기능</string>
+    <string name="function_desc_title_generation">사용자의 첫 메시지를 바탕으로 짧고 정확한 대화 제목을 생성합니다.</string>
     <string name="function_desc_summary">컨텍스트 압축 및 채팅 요약 생성</string>
     <string name="function_desc_memory">메모리를 처리하여 메모리 라이브러리에 저장합니다.</string>
     <string name="function_desc_file_binding">파일 내용의 지능적인 바인딩 및 혼합을 처리하여 보다 정확한 코드 처리 기능을 제공합니다. Gemini Flash와 같은 빠르고 저렴한 모델 사용을 권장하며 DeepSeek R1 사용은 권장하지 않습니다.</string>
@@ -5641,6 +5643,7 @@
     <string name="theme_font_cursive">필기체</string>
     <string name="theme_avatar_description">참고: 왼쪽의 사용자 아바타는 캐릭터 카드 전용 설정입니다. 비어 있으면 오른쪽의 전역 사용자 아바타가 사용됩니다. 전역 사용자 아바타는 모든 캐릭터 카드에서 공유됩니다.</string>
     <string name="functional_config_model_count">%1$d 모델</string>
+    <string name="functional_config_test_title_generation_user_text">교통, 숙소, 음식 추천을 포함해 3일간의 도쿄 여행을 계획하고 싶습니다.</string>
     <string name="functional_config_test_grep_intent">스니펫에서 인사말을 찾으세요.</string>
     <string name="functional_config_test_grep_display_path">&lt;test&gt;</string>
     <string name="functional_config_test_grep_candidates_digest">#1 [파일: example.txt]\nHello world\n#2 [파일: main.kt]\nfun main() {}</string>

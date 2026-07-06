@@ -7,7 +7,7 @@ import android.os.Build
 import android.os.LocaleList
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
-import com.ai.assistance.operit.data.preferences.preferencesManager
+import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -107,22 +107,16 @@ object LocaleUtils {
      * @return 当前语言代码，如zh、en
      */
     fun getCurrentLanguage(context: Context): String {
-        // 优先从全局初始化的preferencesManager获取
         try {
-            // 使用更安全的方式检查preferencesManager是否已初始化
-            val manager = runCatching { preferencesManager }.getOrNull()
-            if (manager != null) {
-                val savedLanguage = manager.getCurrentLanguage()
-                // 如果不是“跟随系统”，则返回保存的语言
-                if (savedLanguage.isNotEmpty() && savedLanguage != LanguageCodes.AUTO) {
-                    return resolveSupportedLanguageCode(savedLanguage)
-                }
+            val savedLanguage =
+                    UserPreferencesManager.getInstance(context).getCurrentLanguage()
+            if (savedLanguage.isNotEmpty() && savedLanguage != LanguageCodes.AUTO) {
+                return resolveSupportedLanguageCode(savedLanguage)
             }
         } catch (e: Exception) {
-            // 错误时静默处理
+            AppLogger.e("LocaleUtils", "读取应用语言设置失败", e)
         }
 
-        // 如果是“跟随系统”或无法获取，则从系统中获取
         return getCurrentSystemLanguage(context)
     }
 
@@ -138,17 +132,13 @@ object LocaleUtils {
      */
     fun setAppLanguage(context: Context, languageCode: String) {
         
-        // 保存到偏好设置 - 只使用全局已初始化的实例
         try {
-            // 使用更安全的方式检查preferencesManager是否已初始化
-            val manager = runCatching { preferencesManager }.getOrNull()
-            if (manager != null) {
-                runBlocking(Dispatchers.IO) {
-                    manager.saveAppLanguage(languageCode)
-                }
+            val manager = UserPreferencesManager.getInstance(context)
+            runBlocking(Dispatchers.IO) {
+                manager.saveAppLanguage(languageCode)
             }
         } catch (e: Exception) {
-            // 错误时静默处理
+            AppLogger.e("LocaleUtils", "保存应用语言设置失败: $languageCode", e)
         }
 
         // 根据 languageCode 获取相应的 Locale

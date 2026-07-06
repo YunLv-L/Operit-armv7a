@@ -53,9 +53,10 @@ class UserPreferencesManager private constructor(private val context: Context) {
 
         fun getInstance(context: Context): UserPreferencesManager {
             return INSTANCE ?: synchronized(this) {
-                val instance = UserPreferencesManager(context.applicationContext)
-                INSTANCE = instance
-                instance
+                INSTANCE ?: run {
+                    val appContext = context.applicationContext ?: context
+                    UserPreferencesManager(appContext).also { INSTANCE = it }
+                }
             }
         }
 

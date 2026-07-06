@@ -2582,6 +2582,19 @@ class EnhancedAIService private constructor(private val context: Context) {
         return conversationService.generateSummaryFromPromptTurns(messages, previousSummary, multiServiceManager, customRules)
     }
 
+
+
+    suspend fun generateConversationTitle(
+        userText: String,
+        attachmentFileNames: List<String> = emptyList()
+    ): String {
+        return conversationService.generateConversationTitle(
+            userText = userText,
+            attachmentFileNames = attachmentFileNames,
+            multiServiceManager = multiServiceManager
+        )
+    }
+
     /**
      * 获取指定功能类型的当前输入token计数
      * @param functionType 功能类型

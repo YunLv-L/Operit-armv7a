@@ -2810,6 +2810,7 @@
 
     <!-- Function Types -->
     <string name="function_type_chat">Chat Function</string>
+    <string name="function_type_title_generation">AI title summary</string>
     <string name="function_type_summary">Conversation Summary</string>
     <string name="function_type_memory">Memory Management</string>
     <string name="function_type_file_binding">File Binding Processing</string>
@@ -2819,6 +2820,7 @@
 
     <!-- Function Descriptions -->
     <string name="function_desc_chat">Main chat function for daily conversation interaction with users</string>
+    <string name="function_desc_title_generation">Generates a short, accurate conversation title from the first user message.</string>
     <string name="function_desc_summary">Compress context and generate chat summaries</string>
     <string name="function_desc_memory">Process memories and store them in the memory library</string>
     <string name="function_desc_file_binding">Process intelligent binding and mixing of file content, providing more precise code processing capabilities. Recommend using fast, inexpensive models like Gemini Flash, not recommended to use DeepSeek R1</string>
@@ -3041,6 +3043,7 @@
     <string name="theme_font_cursive">Cursive</string>
     <string name="theme_avatar_description">Note: The user avatar on the left is a character card exclusive setting. When empty, it will use the global user avatar on the right. The global user avatar is shared across all character cards.</string>
     <string name="functional_config_model_count">%1$d models</string>
+    <string name="functional_config_test_title_generation_user_text">I want to plan a three-day trip to Tokyo, including transport, hotels, and food recommendations.</string>
     <string name="functional_config_test_grep_intent">Find the greeting in the snippet.</string>
     <string name="functional_config_test_grep_display_path">&lt;test&gt;</string>
     <string name="functional_config_test_grep_candidates_digest">#1 [file: example.txt]\nHello world\n#2 [file: main.kt]\nfun main() {}</string>

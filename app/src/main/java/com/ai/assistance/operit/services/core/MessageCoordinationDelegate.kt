@@ -134,6 +134,37 @@ class MessageCoordinationDelegate(
         }
     }
 
+
+
+    private fun fallbackConversationTitle(userText: String, attachments: List<com.ai.assistance.operit.data.model.AttachmentInfo>): String {
+        return attachments.firstOrNull()?.fileName?.trim()?.takeIf { it.isNotBlank() }
+            ?: context.getString(R.string.new_conversation)
+    }
+
+    private fun launchConversationTitleGeneration(
+        chatId: String,
+        userText: String,
+        attachments: List<com.ai.assistance.operit.data.model.AttachmentInfo>,
+        fallbackTitle: String
+    ) {
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val generatedTitle = EnhancedAIService.getChatInstance(context, chatId)
+                    .generateConversationTitle(
+                        userText = userText,
+                        attachmentFileNames = attachments.map { it.fileName }
+                    )
+                    .trim()
+                val currentTitle = chatHistoryDelegate.chatHistories.value.firstOrNull { it.id == chatId }?.title
+                if (generatedTitle.isNotBlank() && currentTitle == fallbackTitle) {
+                    chatHistoryDelegate.updateChatTitle(chatId, generatedTitle)
+                }
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "生成群组对话标题失败", e)
+            }
+        }
+    }
+
     private suspend fun recalculateStableWindowSize(
         service: EnhancedAIService,
         chatId: String?,
@@ -784,14 +815,12 @@ class MessageCoordinationDelegate(
         val replyToMessage = uiBridge.getReplyToMessage()
 
         val isFirstMessage = !chatHistoryDelegate.hasUserMessage(chatId)
-        if (isFirstMessage) {
-            val newTitle =
-                when {
-                    originalUserText.isNotBlank() -> originalUserText
-                    attachments.isNotEmpty() -> attachments.first().fileName
-                    else -> context.getString(R.string.new_conversation)
-                }
-            chatHistoryDelegate.updateChatTitle(chatId, newTitle)
+        val titleFallback = if (isFirstMessage) {
+            fallbackConversationTitle(originalUserText, attachments).also { fallbackTitle ->
+                chatHistoryDelegate.updateChatTitle(chatId, fallbackTitle)
+            }
+        } else {
+            null
         }
 
         val finalUserMessageContent =
@@ -815,6 +844,14 @@ class MessageCoordinationDelegate(
                 }
         )
         chatHistoryDelegate.addMessageToChat(userMessage, chatId)
+        titleFallback?.let { fallbackTitle ->
+            launchConversationTitleGeneration(
+                chatId = chatId,
+                userText = originalUserText,
+                attachments = attachments,
+                fallbackTitle = fallbackTitle
+            )
+        }
 
         var userMessageInsertedForCurrentUserTurn = true
         val memberCardsById = orderedMembers

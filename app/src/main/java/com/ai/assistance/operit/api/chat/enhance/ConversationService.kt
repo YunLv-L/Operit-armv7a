@@ -337,6 +337,81 @@ class ConversationService(
         }
     }
 
+
+
+    suspend fun generateConversationTitle(
+        userText: String,
+        attachmentFileNames: List<String>,
+        multiServiceManager: MultiServiceManager
+    ): String {
+        return try {
+            val useEnglish = LocaleUtils.getCurrentLanguage(context).lowercase().startsWith("en")
+            val systemPrompt = FunctionalPrompts.conversationTitleSystemPrompt(useEnglish)
+            val userPrompt = FunctionalPrompts.conversationTitleUserPrompt(
+                userText = userText,
+                attachmentFileNames = attachmentFileNames,
+                useEnglish = useEnglish
+            )
+            val preparedHistory = listOf(
+                PromptTurn(kind = PromptTurnKind.SYSTEM, content = systemPrompt),
+                PromptTurn(kind = PromptTurnKind.USER, content = userPrompt)
+            )
+            val modelParameters = multiServiceManager.getModelParametersForFunction(FunctionType.TITLE_GENERATION)
+            val titleService = multiServiceManager.getServiceForFunction(FunctionType.TITLE_GENERATION)
+            val contentBuilder = StringBuilder()
+            titleService.sendMessage(
+                context = context,
+                chatHistory = preparedHistory,
+                modelParameters = modelParameters,
+                stream = false,
+                enableRetry = false
+            ).collect { content -> contentBuilder.append(content) }
+
+            val title = sanitizeConversationTitle(
+                ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
+            )
+
+            try {
+                val inputTokens = titleService.inputTokenCount
+                val cachedInputTokens = titleService.cachedInputTokenCount
+                val outputTokens = titleService.outputTokenCount
+                apiPreferences.updateTokensForProviderModel(
+                    titleService.providerModel,
+                    inputTokens,
+                    outputTokens,
+                    cachedInputTokens
+                )
+                apiPreferences.incrementRequestCountForProviderModel(titleService.providerModel)
+                AppLogger.d(TAG, "标题生成使用了输入token: $inputTokens, 缓存token: $cachedInputTokens, 输出token: $outputTokens")
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "更新标题生成token统计失败", e)
+            }
+
+            title
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "生成对话标题时出错", e)
+            ""
+        }
+    }
+
+    private fun sanitizeConversationTitle(rawTitle: String): String {
+        val firstLine = rawTitle
+            .lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.isNotBlank() }
+            .orEmpty()
+        return firstLine
+            .replace(Regex("^[#*`_>\\-\\s]+"), "")
+            .replace(Regex("[#*`_]+$"), "")
+            .replace(Regex("[\\p{Cntrl}&&[^\\n\\t]]"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .trim('"', '\'', '“', '”', '‘', '’', '「', '」', '『', '』')
+            .trimEnd('.', '。', '!', '！', '?', '？', ':', '：', ';', '；', ',', '，')
+            .take(40)
+            .trim()
+    }
+
     private fun buildSummaryPreparedHistory(
         systemPrompt: String,
         chatHistory: List<PromptTurn>,

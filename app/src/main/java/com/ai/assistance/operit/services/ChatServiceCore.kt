@@ -182,6 +182,9 @@ class ChatServiceCore(
             updateChatTitle = { chatId, title ->
                 chatHistoryDelegate.updateChatTitle(chatId, title)
             },
+            getChatTitle = { chatId ->
+                chatHistoryDelegate.chatHistories.value.firstOrNull { it.id == chatId }?.title
+            },
             onTurnComplete = { chatId, service, nextWindowSize, turnOptions ->
                 tokenStatisticsDelegate.updateCumulativeStatistics(chatId, service)
                 val (inputTokens, outputTokens) = tokenStatisticsDelegate.getCumulativeTokenCounts(chatId)

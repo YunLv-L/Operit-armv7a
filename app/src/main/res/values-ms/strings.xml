@@ -2688,6 +2688,7 @@
     <string name="functional_config_warning_audio_unsupported">Amaran: Model yang dipilih semasa tidak mengaktifkan "Sokongan analisis audio", pengenalan/transkripsi audio mungkin tidak tersedia. Sila tukar kepada model yang menyokong input/transkripsi audio dan aktifkan "Model menyokong analisis audio".</string>
     <string name="functional_config_warning_video_unsupported">Amaran: Model yang dipilih semasa tidak mengaktifkan "Sokongan analisis video", pemahaman video mungkin tidak tersedia. Sila tukar kepada model yang menyokong input video/imej dan aktifkan "Model menyokong analisis video".</string>
     <string name="function_type_chat">Fungsi perbualan</string>
+    <string name="function_type_title_generation">Ringkasan tajuk AI</string>
     <string name="function_type_summary">Ringkasan konteks</string>
     <string name="function_type_memory">Kemas kini ingatan</string>
     <string name="function_type_file_binding">Pemprosesan pengikatan fail</string>
@@ -2699,6 +2700,7 @@
     <string name="function_type_audio_recognition">Pengenalan audio</string>
     <string name="function_type_video_recognition">Pengenalan video</string>
     <string name="function_desc_chat">Fungsi perbualan utama, digunakan untuk interaksi perbualan harian dengan pengguna</string>
+    <string name="function_desc_title_generation">Menjana tajuk perbualan yang ringkas dan tepat daripada mesej pertama pengguna.</string>
     <string name="function_desc_summary">Mampatkan konteks, hasilkan ringkasan sembang</string>
 
     <string name="export_invalid_package_name_format">Format tidak betul, sepatutnya com.example.app</string>
@@ -6148,6 +6150,7 @@ Kini anda boleh menggunakan mod AutoGLM di antara muka perbualan.</string>
 
     <string name="theme_avatar_description">Penerangan: Avatar pengguna di sebelah kiri adalah tetapan eksklusif untuk kad watak, dan akan menggunakan avatar pengguna global di sebelah kanan apabila kosong. Avatar pengguna global dikongsi dalam semua kad watak.</string>
     <string name="functional_config_model_count">%1$d model</string>
+    <string name="functional_config_test_title_generation_user_text">Saya mahu merancang perjalanan tiga hari ke Tokyo, termasuk pengangkutan, hotel dan cadangan makanan.</string>
     <string name="functional_config_test_grep_intent">Cari segmen yang mengandungi ucapan salam.</string>
     <string name="functional_config_test_grep_display_path">&lt;测试&gt;</string>
     <string name="functional_config_test_grep_candidates_digest">#1 [fail: example.txt]\nHai dunia\n#2 [fail: main.kt]\nfun main() {}</string>
