@@ -1463,6 +1463,13 @@ fun getJsToolsDefinition(): String {
                     if (options.limit !== undefined && options.limit !== null && !isNaN(Number(options.limit))) params.limit = String(options.limit);
                     return toolCall("get_chat_messages", params);
                 },
+                getMessagesRange: (chatId, options = {}) => {
+                    const params = { chat_id: String(chatId ?? "") };
+                    if (options.order !== undefined && options.order !== null && String(options.order).trim() !== "") params.order = String(options.order);
+                    if (options.start !== undefined && options.start !== null && !isNaN(Number(options.start))) params.start = String(options.start);
+                    if (options.end !== undefined && options.end !== null && !isNaN(Number(options.end))) params.end = String(options.end);
+                    return toolCall("get_chat_messages_range", params);
+                },
                 // 发送消息给AI
                 sendMessage: (message, chatId, roleCardId, senderName, options = {}) => {
                     const params = { message };

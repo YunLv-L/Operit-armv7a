@@ -108,35 +108,44 @@ class OpenAIResponsesProvider(
         }
 
         val reasoningObject = requestJson.optJSONObject("reasoning")
-        val existingEffort =
-            reasoningObject?.optString("effort", "")?.trim()?.takeIf { it.isNotEmpty() }
-
-        when {
-            reasoningObject == null && requestJson.has("reasoning") && !requestJson.isNull("reasoning") -> {
-                AppLogger.w(
-                    "OpenAIResponsesProvider",
-                    "Skipping Responses reasoning adaptation because reasoning is not an object"
-                )
-                return
-            }
-
-            existingEffort != null -> {
-                AppLogger.d(
-                    "OpenAIResponsesProvider",
-                    "Preserving caller-supplied Responses reasoning.effort=$existingEffort"
-                )
-                return
-            }
+        if (reasoningObject == null && requestJson.has("reasoning") && !requestJson.isNull("reasoning")) {
+            AppLogger.w(
+                "OpenAIResponsesProvider",
+                "Skipping Responses reasoning adaptation because reasoning is not an object"
+            )
+            return
         }
 
-        val effort = resolveResponsesReasoningEffort(context) ?: return
         val finalReasoningObject = reasoningObject ?: JSONObject()
-        finalReasoningObject.put("effort", effort)
+        val existingEffort =
+            finalReasoningObject.optString("effort", "").trim().takeIf { it.isNotEmpty() }
+        if (existingEffort == null) {
+            val effort = resolveResponsesReasoningEffort(context)
+            if (effort != null) {
+                finalReasoningObject.put("effort", effort)
+                AppLogger.d(
+                    "OpenAIResponsesProvider",
+                    "Responses reasoning enabled via reasoning.effort=$effort"
+                )
+            }
+        } else {
+            AppLogger.d(
+                "OpenAIResponsesProvider",
+                "Preserving caller-supplied Responses reasoning.effort=$existingEffort"
+            )
+        }
+
+        val existingSummary =
+            finalReasoningObject.optString("summary", "").trim().takeIf { it.isNotEmpty() }
+        if (existingSummary == null) {
+            finalReasoningObject.put("summary", "auto")
+            AppLogger.d(
+                "OpenAIResponsesProvider",
+                "Responses reasoning summary enabled via reasoning.summary=auto"
+            )
+        }
+
         requestJson.put("reasoning", finalReasoningObject)
-        AppLogger.d(
-            "OpenAIResponsesProvider",
-            "Responses reasoning enabled via reasoning.effort=$effort"
-        )
     }
 
     private fun resolveResponsesReasoningEffort(context: Context): String? {
@@ -147,7 +156,7 @@ class OpenAIResponsesProvider(
         }.getOrElse {
             AppLogger.w(
                 "OpenAIResponsesProvider",
-                "Failed to read thinking quality level, falling back to auto reasoning",
+                "Failed to read thinking quality level; reasoning.effort not applied",
                 it
             )
             return null

@@ -1642,6 +1642,20 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             executor = { tool -> runBlocking(Dispatchers.IO) { chatManagerTool.getChatMessages(tool) } }
     )
 
+    handler.registerTool(
+            name = "get_chat_messages_range",
+            descriptionGenerator = { tool ->
+                val chatId = tool.parameters.find { it.name == "chat_id" }?.value ?: ""
+                val order = tool.parameters.find { it.name == "order" }?.value
+                val start = tool.parameters.find { it.name == "start" }?.value
+                val end = tool.parameters.find { it.name == "end" }?.value
+                val orderInfo = if (!order.isNullOrBlank()) " ($order)" else ""
+                val rangeInfo = if (!start.isNullOrBlank() && !end.isNullOrBlank()) " ($start-$end)" else ""
+                s(R.string.toolreg_get_chat_messages_desc, chatId, orderInfo, rangeInfo)
+            },
+            executor = { tool -> runBlocking(Dispatchers.IO) { chatManagerTool.getChatMessagesRange(tool) } }
+    )
+
     // 文件系统工具
     val fileSystemTools = ToolGetter.getFileSystemTools(context)
 

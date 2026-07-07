@@ -117,6 +117,14 @@ getMessages(chatId: string, options?: { order?: 'asc' | 'desc'; limit?: number }
 
 读取某个聊天的消息记录。
 
+### `getMessagesRange(chatId, options)`
+
+```ts
+getMessagesRange(chatId: string, options: { order?: 'asc' | 'desc'; start: number; end: number }): Promise<ChatMessagesResultData>
+```
+
+按从 0 开始的消息序号区间读取某个聊天的消息记录，`start` 和 `end` 都是包含边界。
+
 ## 返回值
 
 `chat.d.ts` 的返回值都定义在 `results.d.ts` 中，常见的有：
@@ -167,6 +175,17 @@ const messages = await Tools.Chat.getMessages('chat_123', {
   limit: 20
 });
 console.log(messages.toString());
+```
+
+### 按区间读取消息
+
+```ts
+const messages = await Tools.Chat.getMessagesRange('chat_123', {
+  order: 'asc',
+  start: 200,
+  end: 399
+});
+console.log(messages.messages.length);
 ```
 
 ## 相关文件

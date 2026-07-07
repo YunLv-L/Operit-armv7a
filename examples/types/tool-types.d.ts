@@ -205,6 +205,7 @@ export interface ToolResultMap {
     'send_message_to_ai_streaming': MessageSendResultData;
     'list_character_cards': CharacterCardListResultData;
     'get_chat_messages': ChatMessagesResultData;
+    'get_chat_messages_range': ChatMessagesResultData;
 
     // Memory operations
     'link_memories': MemoryLinkResultData;

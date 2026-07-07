@@ -56,6 +56,23 @@
             ]
         },
         {
+            "name": "read_messages_range",
+            "description": {
+                "zh": "按消息序号区间读取指定对话的消息；用于超过 read_messages 单次条数限制的大范围读取。",
+                "en": "Read messages from a chat by message index range; useful for reading beyond read_messages single-call limits."
+            },
+            "parameters": [
+                { "name": "chat_id", "description": { "zh": "目标对话 ID（可选）", "en": "Target chat id (optional)" }, "type": "string", "required": false },
+                { "name": "chat_title", "description": { "zh": "目标对话标题（可选；当 chat_id 为空时使用）", "en": "Target chat title (optional; used when chat_id is empty)" }, "type": "string", "required": false },
+                { "name": "chat_query", "description": { "zh": "可选：标题筛选关键字（当 chat_id/chat_title 为空时使用）", "en": "Optional title keyword (used when chat_id/chat_title is empty)" }, "type": "string", "required": false },
+                { "name": "chat_index", "description": { "zh": "可选：当筛选结果有多个时选择第 N 个（默认 0）", "en": "Optional: pick Nth when multiple matches (default 0)" }, "type": "number", "required": false },
+                { "name": "match", "description": { "zh": "可选：contains/exact/regex（默认 contains）", "en": "Optional: contains/exact/regex (default contains)" }, "type": "string", "required": false },
+                { "name": "order", "description": { "zh": "可选：asc/desc（默认 asc）", "en": "Optional: asc/desc (default asc)" }, "type": "string", "required": false },
+                { "name": "start", "description": { "zh": "从 0 开始的起始消息序号（包含）", "en": "Zero-based start message index (inclusive)" }, "type": "number", "required": true },
+                { "name": "end", "description": { "zh": "从 0 开始的结束消息序号（包含）", "en": "Zero-based end message index (inclusive)" }, "type": "number", "required": true }
+            ]
+        },
+        {
             "name": "rename_chat",
             "description": {
                 "zh": "重命名指定对话（可按 chat_id 或 chat_title 指定）。",
@@ -141,6 +158,12 @@ const HistoryChat = (function () {
     type ReadMessagesParams = ResolveChatIdParams & {
         order?: string;
         limit?: number;
+    };
+
+    type ReadMessagesRangeParams = ResolveChatIdParams & {
+        order?: string;
+        start?: number;
+        end?: number;
     };
 
     type RenameChatParams = ResolveChatIdParams & {
@@ -295,6 +318,49 @@ const HistoryChat = (function () {
         return {
             success: true,
             message: '读取对话消息完成',
+            data: {
+                result,
+                text,
+            },
+        };
+    }
+
+    async function read_messages_range_impl(params: ReadMessagesRangeParams): Promise<ToolResponse> {
+        const chatId = await resolveChatId(params || {});
+
+        const orderRaw = params && params.order !== undefined ? String(params.order).trim().toLowerCase() : '';
+        const order = (orderRaw === 'asc' || orderRaw === 'desc') ? orderRaw : 'asc';
+
+        const startRaw = params && params.start !== undefined ? Number(params.start) : Number.NaN;
+        const endRaw = params && params.end !== undefined ? Number(params.end) : Number.NaN;
+        if (isNaN(startRaw) || isNaN(endRaw)) {
+            throw new Error('Missing parameter: start and end are required');
+        }
+        const start = Math.floor(startRaw);
+        const end = Math.floor(endRaw);
+        if (start < 0 || end < start) {
+            throw new Error('Invalid parameter: range requires 0 <= start <= end');
+        }
+
+        const result = await Tools.Chat.getMessagesRange(chatId, {
+            order,
+            start,
+            end,
+        });
+
+        const rawMessages = result.messages;
+        const text = rawMessages
+            .map((m) => {
+                const role = (m.roleName ?? m.sender ?? '').toString() || 'message';
+                const ts = (m.timestamp !== undefined && m.timestamp !== null) ? String(m.timestamp) : '';
+                const header = ts ? `[${ts}] ${role}` : role;
+                return `${header}:\n${(m.content ?? '').toString()}`;
+            })
+            .join('\n\n');
+
+        return {
+            success: true,
+            message: '按区间读取对话消息完成',
             data: {
                 result,
                 text,
@@ -507,6 +573,10 @@ const HistoryChat = (function () {
         return await wrapToolExecution(read_messages_impl, params);
     }
 
+    async function read_messages_range(params: ReadMessagesRangeParams): Promise<void> {
+        return await wrapToolExecution(read_messages_range_impl, params);
+    }
+
     async function rename_chat(params: RenameChatParams): Promise<void> {
         return await wrapToolExecution(rename_chat_impl, params);
     }
@@ -549,6 +619,7 @@ const HistoryChat = (function () {
         list_chats,
         find_chat,
         read_messages,
+        read_messages_range,
         rename_chat,
         delete_chat,
         chat_with_agent,
@@ -561,6 +632,7 @@ const HistoryChat = (function () {
 exports.list_chats = HistoryChat.list_chats;
 exports.find_chat = HistoryChat.find_chat;
 exports.read_messages = HistoryChat.read_messages;
+exports.read_messages_range = HistoryChat.read_messages_range;
 exports.rename_chat = HistoryChat.rename_chat;
 exports.delete_chat = HistoryChat.delete_chat;
 exports.chat_with_agent = HistoryChat.chat_with_agent;

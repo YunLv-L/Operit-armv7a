@@ -46,7 +46,6 @@ import com.ai.assistance.operit.util.MediaPoolManager
 import com.ai.assistance.operit.util.HttpMultiPartDownloader
 import com.ai.assistance.operit.util.FFmpegUtil
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -55,13 +54,9 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.last
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.yield
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.core.content.FileProvider
@@ -71,15 +66,12 @@ import com.ai.assistance.operit.core.config.FunctionalPrompts
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
-import com.ai.assistance.operit.terminal.data.PackageManagerType
 import com.ai.assistance.operit.terminal.TerminalManager
 import com.ai.assistance.operit.terminal.provider.filesystem.FileSystemProvider
-import com.ai.assistance.operit.terminal.provider.type.HiddenExecResult
 import com.ai.assistance.operit.terminal.utils.SSHFileConnectionManager
-import com.ai.assistance.operit.terminal.utils.SourceManager
 import com.ai.assistance.operit.core.tools.defaultTool.PathValidator
-import com.ai.assistance.operit.core.tools.system.Terminal
 import com.ai.assistance.operit.util.LocaleUtils
+import com.ai.assistance.operit.util.ripgrep.NativeRipgrep
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -90,14 +82,6 @@ import java.util.concurrent.atomic.AtomicInteger
 open class StandardFileSystemTools(protected val context: Context) {
     companion object {
         protected const val TAG = "FileSystemTools"
-        private const val RIPGREP_EXECUTOR_POOL_SIZE = 4
-        private const val RIPGREP_COMMAND_TIMEOUT_MS = 10_000L
-        private const val RIPGREP_PARSE_TIMEOUT_MS = 5_000L
-        private const val RIPGREP_PARSE_YIELD_EVERY_LINES = 256
-        private val ripgrepInstallMutex = Mutex()
-        @Volatile
-        private var ripgrepAvailabilityVerified = false
-
         // 特殊文件类型扩展名列表（需要特殊处理提取文本的文件类型）
         protected val SPECIAL_FILE_EXTENSIONS = listOf(
             "doc", "docx",      // Word documents
@@ -122,10 +106,6 @@ open class StandardFileSystemTools(protected val context: Context) {
     // TerminalManager（单例，懒加载）
     private val terminalManager by lazy {
         TerminalManager.getInstance(context)
-    }
-
-    private val terminalSourceManager by lazy {
-        SourceManager(context)
     }
 
     private var lastLinuxFileSystemProviderLabel: String? = null
@@ -179,12 +159,6 @@ open class StandardFileSystemTools(protected val context: Context) {
         val round: Int
     )
 
-    protected data class RipgrepBlockLine(
-        val lineNumber: Int,
-        val text: String,
-        val isMatch: Boolean
-    )
-
     protected data class RipgrepBlock(
         val filePath: String,
         val firstMatchLine: Int,
@@ -196,7 +170,6 @@ open class StandardFileSystemTools(protected val context: Context) {
     private data class RipgrepQueryExecution(
         val index: Int,
         val query: String,
-        val commandResult: HiddenExecResult,
         val parsedBlocks: List<RipgrepBlock>
     )
 
@@ -297,432 +270,51 @@ open class StandardFileSystemTools(protected val context: Context) {
         return trimmed.take(maxChars) + "...(truncated)"
     }
 
-    private fun buildRipgrepCommand(args: List<String>): String {
-        val quotedArgs = args.joinToString(" ") { shellQuote(it) }
-        return "rg $quotedArgs"
-    }
-
-    private fun addWorkspaceSearchExcludes(args: MutableList<String>) {
-        listOf("!.backup/**", "!.operit/**", "!backup/**").forEach { glob ->
-            args.add("-g")
-            args.add(glob)
-        }
-    }
-
-    private fun buildRipgrepCodeCommand(
+    private suspend fun searchNativeRipgrepBlocks(
         path: String,
-        pattern: String,
+        patterns: List<String>,
         filePattern: String,
         caseInsensitive: Boolean,
         contextLines: Int,
-        maxResults: Int? = null
-    ): String {
-        val args = mutableListOf(
-            "--json",
-            "--line-number",
-            "--column",
-            "--color",
-            "never",
-            "--hidden",
-            "-C",
-            contextLines.coerceAtLeast(0).toString()
-        )
-        addWorkspaceSearchExcludes(args)
-        if (caseInsensitive) {
-            args.add("-i")
+        maxResults: Int
+    ): Pair<List<RipgrepBlock>, Int> =
+        withContext(Dispatchers.IO) {
+            val rawResult =
+                NativeRipgrep.searchJson(
+                    path = path,
+                    patterns = patterns.toTypedArray(),
+                    filePattern = filePattern,
+                    caseInsensitive = caseInsensitive,
+                    literal = false,
+                    contextLines = contextLines.coerceAtLeast(0),
+                    maxResults = maxResults.coerceAtLeast(0)
+                )
+            parseNativeRipgrepBlocks(rawResult)
         }
-        if (filePattern.isNotBlank() && filePattern != "*") {
-            args.add("-g")
-            args.add(filePattern)
+
+    private fun parseNativeRipgrepBlocks(output: String): Pair<List<RipgrepBlock>, Int> {
+        val json = JSONObject(output)
+        if (!json.optBoolean("success", false)) {
+            throw IllegalStateException(json.optString("error").ifBlank { "native ripgrep search failed" })
         }
-        val effectiveMaxResults = maxResults?.coerceAtLeast(0)
-        if (effectiveMaxResults != null && effectiveMaxResults > 0) {
-            args.add("--max-count")
-            args.add(effectiveMaxResults.toString())
-        }
-        args.add("--")
-        args.add(pattern)
-        args.add(path)
-        return buildRipgrepCommand(args)
-    }
 
-    private fun buildRipgrepContextCommand(
-        path: String,
-        queries: List<String>,
-        filePattern: String,
-        contextLines: Int
-    ): String {
-        val args = mutableListOf(
-            "--json",
-            "--line-number",
-            "--column",
-            "--color",
-            "never",
-            "--hidden",
-            "-F",
-            "-i",
-            "-C",
-            contextLines.coerceAtLeast(0).toString()
-        )
-        addWorkspaceSearchExcludes(args)
-        if (filePattern.isNotBlank() && filePattern != "*") {
-            args.add("-g")
-            args.add(filePattern)
-        }
-        queries.forEach { query ->
-            args.add("-e")
-            args.add(query)
-        }
-        args.add("--")
-        args.add(path)
-        return buildRipgrepCommand(args)
-    }
-
-    private fun extractRipgrepPath(json: JSONObject): String? {
-        return json.optJSONObject("path")?.optString("text")?.takeIf { it.isNotBlank() }
-    }
-
-    private fun finalizeRipgrepBlock(
-        filePath: String,
-        lines: List<RipgrepBlockLine>
-    ): RipgrepBlock? {
-        if (lines.isEmpty()) return null
-        val matchLines = lines.filter { it.isMatch }
-        if (matchLines.isEmpty()) return null
-
-        val lineContent =
-            if (matchLines.size == 1) {
-                clipGrepText(matchLines.first().text, 300)
-            } else {
-                val digest =
-                    matchLines
-                        .take(5)
-                        .joinToString(" | ") { clipGrepText(it.text, 80) }
-                "${matchLines.size} matches: ${digest.take(200)}..."
-            }
-
-        val matchContext =
-            clipGrepText(
-                lines.joinToString("\n") { clipGrepText(it.text, 400) },
-                4000
-            )
-
-        return RipgrepBlock(
-            filePath = filePath,
-            firstMatchLine = matchLines.first().lineNumber,
-            lineContent = lineContent,
-            matchContext = matchContext,
-            matchCount = matchLines.size
-        )
-    }
-
-    private suspend fun parseRipgrepBlocks(
-        output: String,
-        maxBlocks: Int? = null
-    ): Pair<List<RipgrepBlock>, Int> {
+        val blocksJson = json.optJSONArray("blocks")
         val blocks = mutableListOf<RipgrepBlock>()
-        val currentBlocks = LinkedHashMap<String, MutableList<RipgrepBlockLine>>()
-        val seenFiles = LinkedHashSet<String>()
-        var summarySearches: Int? = null
-        val effectiveMaxBlocks = maxBlocks?.coerceAtLeast(0)
-        var lineCount = 0
-
-        fun flushBlock(filePath: String) {
-            if (effectiveMaxBlocks != null && blocks.size >= effectiveMaxBlocks) {
-                currentBlocks.remove(filePath)
-                return
-            }
-            val current = currentBlocks.remove(filePath) ?: return
-            finalizeRipgrepBlock(filePath, current)?.let { blocks.add(it) }
-        }
-
-        parseLoop@ for (rawLine in output.lineSequence()) {
-            lineCount++
-            if (lineCount % RIPGREP_PARSE_YIELD_EVERY_LINES == 0) {
-                yield()
-            }
-
-            val trimmed = rawLine.trim()
-            if (!trimmed.startsWith("{")) continue
-            if (effectiveMaxBlocks != null && blocks.size >= effectiveMaxBlocks) {
-                break
-            }
-
-            val json = runCatching { JSONObject(trimmed) }.getOrNull() ?: continue
-            when (json.optString("type")) {
-                "begin" -> {
-                    val data = json.optJSONObject("data") ?: continue@parseLoop
-                    extractRipgrepPath(data)?.let { seenFiles.add(it) }
-                }
-                "match", "context" -> {
-                    val data = json.optJSONObject("data") ?: continue@parseLoop
-                    val filePath = extractRipgrepPath(data) ?: continue@parseLoop
-                    val lineNumber = data.optInt("line_number", -1)
-                    if (lineNumber < 1) continue@parseLoop
-                    val text =
-                        data.optJSONObject("lines")
-                            ?.optString("text")
-                            ?.trimEnd('\n', '\r')
-                            ?: continue@parseLoop
-
-                    seenFiles.add(filePath)
-                    val current = currentBlocks[filePath]
-                    if (current == null) {
-                        currentBlocks[filePath] = mutableListOf(
-                            RipgrepBlockLine(
-                                lineNumber = lineNumber,
-                                text = text,
-                                isMatch = json.optString("type") == "match"
-                            )
-                        )
-                    } else {
-                        val previousLine = current.lastOrNull()?.lineNumber ?: -1
-                        if (previousLine >= 0 && lineNumber > previousLine + 1) {
-                            flushBlock(filePath)
-                            if (effectiveMaxBlocks != null && blocks.size >= effectiveMaxBlocks) {
-                                break@parseLoop
-                            }
-                            currentBlocks[filePath] = mutableListOf(
-                                RipgrepBlockLine(
-                                    lineNumber = lineNumber,
-                                    text = text,
-                                    isMatch = json.optString("type") == "match"
-                                )
-                            )
-                        } else {
-                            current.add(
-                                RipgrepBlockLine(
-                                    lineNumber = lineNumber,
-                                    text = text,
-                                    isMatch = json.optString("type") == "match"
-                                )
-                            )
-                        }
-                    }
-                }
-                "end" -> {
-                    val data = json.optJSONObject("data") ?: continue@parseLoop
-                    val filePath = extractRipgrepPath(data)
-                    if (!filePath.isNullOrBlank()) {
-                        flushBlock(filePath)
-                        if (effectiveMaxBlocks != null && blocks.size >= effectiveMaxBlocks) {
-                            break@parseLoop
-                        }
-                    }
-                }
-                "summary" -> {
-                    summarySearches =
-                        json.optJSONObject("data")
-                            ?.optJSONObject("stats")
-                            ?.optInt("searches")
-                    for (filePath in currentBlocks.keys.toList()) {
-                        flushBlock(filePath)
-                        if (effectiveMaxBlocks != null && blocks.size >= effectiveMaxBlocks) {
-                            break
-                        }
-                    }
-                }
-            }
-        }
-
-        for (filePath in currentBlocks.keys.toList()) {
-            flushBlock(filePath)
-            if (effectiveMaxBlocks != null && blocks.size >= effectiveMaxBlocks) {
-                break
-            }
-        }
-        return Pair(blocks, summarySearches ?: seenFiles.size)
-    }
-
-    private fun extractRipgrepNonJsonLines(output: String): List<String> {
-        return output.lineSequence()
-            .map { it.trim() }
-            .filter { line -> line.isNotBlank() && !line.startsWith("{") }
-            .distinct()
-            .toList()
-    }
-
-    private fun buildRipgrepAvailabilityCheckCommand(): String {
-        return "command -v rg >/dev/null 2>&1 && printf '__OPERIT_RG_READY__\\n' || printf '__OPERIT_RG_MISSING__\\n'"
-    }
-
-    private fun buildRipgrepInstallCommand(): String {
-        val aptSource =
-            terminalSourceManager.getSelectedSource(PackageManagerType.APT)
-        val aptSourceCommand = terminalSourceManager.getAptSourceChangeCommand(aptSource)
-        return buildString {
-            appendLine(aptSourceCommand)
-            appendLine("export DEBIAN_FRONTEND=noninteractive")
-            appendLine("apt update")
-            appendLine("apt install -y ripgrep")
-        }.trim()
-    }
-
-    private fun buildRipgrepInstallFailureMessage(output: String): String {
-        val lines =
-            output.lineSequence()
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-                .toList()
-
-        if (lines.any { it.contains("Unable to locate package ripgrep", ignoreCase = true) }) {
-            return "Failed to install ripgrep automatically: package ripgrep was not found in apt sources"
-        }
-
-        if (lines.any { it.contains("Could not get lock", ignoreCase = true) }) {
-            return "Failed to install ripgrep automatically: apt is locked by another process"
-        }
-
-        if (lines.any { it.contains("apt: command not found", ignoreCase = true) || it.contains("command not found: apt", ignoreCase = true) }) {
-            return "Failed to install ripgrep automatically: apt is not available in the terminal environment"
-        }
-
-        val tail = lines.takeLast(12).joinToString("\n")
-        return if (tail.isNotBlank()) {
-            "Failed to install ripgrep automatically:\n$tail"
-        } else {
-            "Failed to install ripgrep automatically"
-        }
-    }
-
-    private suspend fun executeInRipgrepExecutor(
-        command: String,
-        executorKey: String,
-        timeoutMs: Long = 120000L
-    ): HiddenExecResult {
-        val terminal = Terminal.getInstance(context)
-        return terminal.executeHiddenCommand(
-            command = command,
-            executorKey = executorKey,
-            timeoutMs = timeoutMs
-        )
-    }
-
-    private fun buildHiddenCommandFailureMessage(
-        action: String,
-        result: HiddenExecResult
-    ): String {
-        val reason =
-            result.error.ifBlank {
-                "Hidden terminal command failed with state ${result.state}"
-            }
-        val preview = result.rawOutputPreview.trim()
-        return buildString {
-            append(action)
-            append(": ")
-            append(reason)
-            append(" [state=")
-            append(result.state)
-            append("]")
-            if (result.exitCode >= 0) {
-                append(" (exit code ")
-                append(result.exitCode)
-                append(")")
-            }
-            if (preview.isNotBlank()) {
-                append("\nRaw terminal output tail:\n")
-                append(preview)
-            }
-        }
-    }
-
-    private fun requireHiddenCommandSuccess(
-        action: String,
-        result: HiddenExecResult
-    ): HiddenExecResult {
-        if (result.isOk) {
-            return result
-        }
-        throw IllegalStateException(buildHiddenCommandFailureMessage(action, result))
-    }
-
-    private suspend fun ensureRipgrepAvailable(toolName: String) {
-        if (ripgrepAvailabilityVerified) {
-            return
-        }
-
-        ripgrepInstallMutex.withLock {
-            if (ripgrepAvailabilityVerified) {
-                return
-            }
-
-            val checkResult =
-                requireHiddenCommandSuccess(
-                    action = "Failed to check ripgrep availability",
-                    result =
-                        executeInRipgrepExecutor(
-                            command = buildRipgrepAvailabilityCheckCommand(),
-                            executorKey = "rg-setup"
-                        )
-                )
-            if (checkResult.output.contains("__OPERIT_RG_READY__")) {
-                ripgrepAvailabilityVerified = true
-                return
-            }
-
-            ToolProgressBus.update(toolName, 0.08f, "Installing ripgrep...")
-            val installResult =
-                requireHiddenCommandSuccess(
-                    action = "Failed to install ripgrep",
-                    result =
-                        executeInRipgrepExecutor(
-                            command = buildRipgrepInstallCommand(),
-                            executorKey = "rg-setup",
-                            timeoutMs = 600000L
-                        )
-                )
-            val verifyResult =
-                requireHiddenCommandSuccess(
-                    action = "Failed to verify ripgrep installation",
-                    result =
-                        executeInRipgrepExecutor(
-                            command = buildRipgrepAvailabilityCheckCommand(),
-                            executorKey = "rg-setup"
-                        )
-                )
-            if (!verifyResult.output.contains("__OPERIT_RG_READY__")) {
-                throw IllegalStateException(
-                    buildRipgrepInstallFailureMessage(
-                        if (installResult.output.isNotBlank()) installResult.output else verifyResult.output
+        if (blocksJson != null) {
+            for (index in 0 until blocksJson.length()) {
+                val block = blocksJson.optJSONObject(index) ?: continue
+                blocks.add(
+                    RipgrepBlock(
+                        filePath = block.optString("filePath"),
+                        firstMatchLine = block.optInt("firstMatchLine", 0),
+                        lineContent = block.optString("lineContent"),
+                        matchContext = block.optString("matchContext"),
+                        matchCount = block.optInt("matchCount", 0)
                     )
                 )
             }
-            ripgrepAvailabilityVerified = true
         }
-    }
-
-    private suspend fun executeRipgrepCommand(
-        toolName: String,
-        command: String,
-        executorKey: String
-    ): HiddenExecResult {
-        ensureRipgrepAvailable(toolName)
-        ToolProgressBus.update(toolName, 0.1f, "Running ripgrep...")
-        return requireHiddenCommandSuccess(
-            action = "Failed to capture ripgrep output",
-            result =
-                executeInRipgrepExecutor(
-                    command = command,
-                    executorKey = executorKey,
-                    timeoutMs = RIPGREP_COMMAND_TIMEOUT_MS
-                )
-        )
-    }
-
-    private fun buildRipgrepFailureMessage(output: String, exitCode: Int? = null): String {
-        val nonJsonLines = extractRipgrepNonJsonLines(output)
-
-        if (exitCode == 127) {
-            return "ripgrep (rg) is not available in the terminal environment"
-        }
-
-        return nonJsonLines.joinToString("\n").ifBlank {
-            if (exitCode != null) {
-                "ripgrep command failed with exit code $exitCode"
-            } else {
-                "ripgrep command failed"
-            }
-        }
+        return Pair(blocks, json.optInt("filesSearched", 0))
     }
 
     protected fun buildCandidateDigestForModel(
@@ -845,22 +437,15 @@ open class StandardFileSystemTools(protected val context: Context) {
             coroutineScope {
                 indexedQueries.map { (index, query) ->
                     async {
-                        val command =
-                            buildRipgrepCodeCommand(
+                        val (parsedBlocks, _) =
+                            searchNativeRipgrepBlocks(
                                 path = searchPath,
-                                pattern = query,
+                                patterns = listOf(query),
                                 filePattern = filePattern,
                                 caseInsensitive = true,
-                                contextLines = 3
+                                contextLines = 3,
+                                maxResults = perQueryMaxResults
                             )
-                        val commandResult =
-                            executeRipgrepCommand(
-                                toolName = toolNameForProgress ?: "grep_context",
-                                command = command,
-                                executorKey = "rg-${index % RIPGREP_EXECUTOR_POOL_SIZE}"
-                            )
-                        val output = commandResult.output
-                        val (parsedBlocks, _) = parseRipgrepBlocks(output)
 
                         if (toolNameForProgress != null && progressSpan > 0f) {
                             val completed = completedQueries.incrementAndGet()
@@ -877,7 +462,6 @@ open class StandardFileSystemTools(protected val context: Context) {
                         RipgrepQueryExecution(
                             index = index,
                             query = query,
-                            commandResult = commandResult,
                             parsedBlocks = parsedBlocks
                         )
                     }
@@ -886,14 +470,6 @@ open class StandardFileSystemTools(protected val context: Context) {
 
         executions.forEach { execution ->
             if (execution.parsedBlocks.isEmpty()) {
-                if (execution.commandResult.exitCode > 1) {
-                    throw IllegalStateException(
-                        buildRipgrepFailureMessage(
-                            execution.commandResult.output,
-                            execution.commandResult.exitCode
-                        )
-                    )
-                }
                 return@forEach
             }
 
@@ -953,7 +529,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         }
     }
 
-    protected suspend fun grepCodeWithRipgrep(
+    protected suspend fun grepCodeWithNativeRipgrep(
         toolName: String,
         path: String,
         pattern: String,
@@ -982,49 +558,16 @@ open class StandardFileSystemTools(protected val context: Context) {
                 )
             }
 
-            ToolProgressBus.update(toolName, 0.05f, "Preparing ripgrep...")
-            val command =
-                buildRipgrepCodeCommand(
+            ToolProgressBus.update(toolName, 0.1f, "Running native ripgrep...")
+            val (parsedBlocks, filesSearched) =
+                searchNativeRipgrepBlocks(
                     path = path,
-                    pattern = pattern,
+                    patterns = listOf(pattern),
                     filePattern = filePattern,
                     caseInsensitive = caseInsensitive,
                     contextLines = contextLines,
                     maxResults = effectiveMaxResults
                 )
-            val commandResult =
-                executeRipgrepCommand(
-                    toolName = toolName,
-                    command = command,
-                    executorKey = "rg-0"
-                )
-            val output = commandResult.output
-
-            if (commandResult.exitCode > 1) {
-                return ToolResult(
-                    toolName = toolName,
-                    success = false,
-                    result = StringResultData(""),
-                    error = buildRipgrepFailureMessage(output, commandResult.exitCode)
-                )
-            }
-
-            ToolProgressBus.update(toolName, 0.7f, "Parsing ripgrep results...")
-            val (parsedBlocks, filesSearched) =
-                try {
-                    withTimeout(RIPGREP_PARSE_TIMEOUT_MS) {
-                        parseRipgrepBlocks(output, maxBlocks = effectiveMaxResults)
-                    }
-                } catch (e: TimeoutCancellationException) {
-                    AppLogger.w(TAG, "grep_code ripgrep output parsing timed out", e)
-                    ToolProgressBus.update(toolName, 1f, "Search failed")
-                    return ToolResult(
-                        toolName = toolName,
-                        success = false,
-                        result = StringResultData(""),
-                        error = "grep_code timed out while parsing ripgrep results"
-                    )
-                }
             val limitedBlocks = parsedBlocks.take(effectiveMaxResults)
             val fileMatches = groupRipgrepBlocks(limitedBlocks)
             ToolProgressBus.update(toolName, 1f, "Search completed")
@@ -1043,13 +586,13 @@ open class StandardFileSystemTools(protected val context: Context) {
                 error = ""
             )
         } catch (e: Exception) {
-            AppLogger.e(TAG, "Error performing ripgrep code search", e)
+            AppLogger.e(TAG, "Error performing native ripgrep code search", e)
             ToolProgressBus.update(toolName, 1f, "Search failed")
             ToolResult(
                 toolName = toolName,
                 success = false,
                 result = StringResultData(""),
-                error = "Error performing grep search: ${e.message}"
+                error = "Error performing native grep search: ${e.message}"
             )
         }
     }
@@ -5113,7 +4656,7 @@ open class StandardFileSystemTools(protected val context: Context) {
             )
         }
 
-        return grepCodeWithRipgrep(
+        return grepCodeWithNativeRipgrep(
             toolName = tool.name,
             path = path,
             pattern = pattern,

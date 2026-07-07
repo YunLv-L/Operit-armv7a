@@ -119,6 +119,12 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getMessagesForChatDesc(chatId: String, limit: Int): List<MessageEntity>
 
+    @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp ASC LIMIT :limit OFFSET :offset")
+    suspend fun getMessagesForChatAscRange(chatId: String, offset: Int, limit: Int): List<MessageEntity>
+
+    @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    suspend fun getMessagesForChatDescRange(chatId: String, offset: Int, limit: Int): List<MessageEntity>
+
     @Query(
         "SELECT * FROM messages WHERE chatId = :chatId AND timestamp > :afterTimestampExclusive ORDER BY timestamp ASC LIMIT :limit"
     )

@@ -1676,6 +1676,8 @@ export interface ChatMessagesResultData {
     order: string;
     limit: number;
     messages: ChatMessageInfo[];
+    start?: number;
+    end?: number;
     toString(): string;
 }
 

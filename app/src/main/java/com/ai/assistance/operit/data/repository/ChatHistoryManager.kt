@@ -1629,6 +1629,30 @@ class ChatHistoryManager private constructor(private val context: Context) {
         }
     }
 
+    suspend fun loadChatMessagesRange(
+        chatId: String,
+        order: String? = null,
+        start: Int,
+        end: Int,
+    ): List<ChatMessage> {
+        return kotlinx.coroutines.withContext(Dispatchers.IO) {
+            try {
+                val normalizedOrder = order?.trim()?.lowercase()
+                val limit = end - start + 1
+
+                val messageEntities = when (normalizedOrder) {
+                    "desc" -> messageDao.getMessagesForChatDescRange(chatId, start, limit)
+                    else -> messageDao.getMessagesForChatAscRange(chatId, start, limit)
+                }
+
+                hydrateMessages(chatId, messageEntities)
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "按区间加载聊天消息失败", e)
+                emptyList()
+            }
+        }
+    }
+
     /** 搜索包含特定关键词的聊天ID列表 */
     suspend fun searchChatIdsByContent(query: String): Set<String> {
         return kotlinx.coroutines.withContext(Dispatchers.IO) {

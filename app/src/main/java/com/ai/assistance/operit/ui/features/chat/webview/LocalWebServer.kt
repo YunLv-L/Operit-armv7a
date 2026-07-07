@@ -68,8 +68,7 @@ private constructor(
 
     companion object {
         private const val TAG = "LocalWebServer"
-        private const val F_SETFD = 2
-        private const val FD_CLOEXEC = 1
+        private const val SOCK_CLOEXEC = 0x80000
 
         // Port constants
         const val WORKSPACE_PORT = 8093
@@ -105,25 +104,7 @@ private constructor(
                     is Inet4Address -> OsConstants.AF_INET
                     else -> OsConstants.AF_INET
                 }
-                val descriptor = Os.socket(domain, OsConstants.SOCK_STREAM, 0)
-                try {
-                    setCloseOnExec(descriptor)
-                    descriptor
-                } catch (e: SocketException) {
-                    try {
-                        Os.close(descriptor)
-                    } catch (_: ErrnoException) {
-                    }
-                    throw e
-                }
-            } catch (e: ErrnoException) {
-                throw SocketException(e.message)
-            }
-        }
-
-        private fun setCloseOnExec(descriptor: FileDescriptor) {
-            try {
-                Os.fcntlInt(descriptor, F_SETFD, FD_CLOEXEC)
+                Os.socket(domain, OsConstants.SOCK_STREAM or SOCK_CLOEXEC, 0)
             } catch (e: ErrnoException) {
                 throw SocketException(e.message)
             }
@@ -249,15 +230,6 @@ private constructor(
                 Os.accept(descriptor, acceptedAddress)
             } catch (e: ErrnoException) {
                 throw SocketException(e.message)
-            }
-            try {
-                setCloseOnExec(acceptedFd)
-            } catch (e: SocketException) {
-                try {
-                    Os.close(acceptedFd)
-                } catch (_: ErrnoException) {
-                }
-                throw e
             }
             return CloseOnExecSocket(acceptedFd, acceptedAddress)
         }

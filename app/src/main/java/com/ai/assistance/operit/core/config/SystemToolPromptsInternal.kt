@@ -1355,7 +1355,38 @@ object SystemToolPromptsInternal {
                                         name = "limit",
                                         type = "integer",
                                         description = "optional, number of messages to return (default 20, max 200)",
+                                          required = false
+                                      )
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "get_chat_messages_range",
+                            description = "Get messages from a specific chat by zero-based message index range.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema(
+                                        name = "chat_id",
+                                        type = "string",
+                                        description = "target chat id",
+                                        required = true
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "order",
+                                        type = "string",
+                                        description = "optional, asc/desc (default asc)",
                                         required = false
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "start",
+                                        type = "integer",
+                                        description = "zero-based start message index in the selected order, inclusive",
+                                        required = true
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "end",
+                                        type = "integer",
+                                        description = "zero-based end message index in the selected order, inclusive",
+                                        required = true
                                     )
                                 )
                         )
@@ -4321,7 +4352,38 @@ object SystemToolPromptsInternal {
                                         name = "limit",
                                         type = "integer",
                                         description = "可选，返回消息条数（默认20，最大200）",
+                                          required = false
+                                      )
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "get_chat_messages_range",
+                            description = "按从 0 开始的消息序号区间读取指定对话的消息内容。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema(
+                                        name = "chat_id",
+                                        type = "string",
+                                        description = "目标对话 ID",
+                                        required = true
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "order",
+                                        type = "string",
+                                        description = "可选，asc/desc（默认 asc）",
                                         required = false
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "start",
+                                        type = "integer",
+                                        description = "所选排序下从 0 开始的起始消息序号，包含该条",
+                                        required = true
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "end",
+                                        type = "integer",
+                                        description = "所选排序下从 0 开始的结束消息序号，包含该条",
+                                        required = true
                                     )
                                 )
                         )

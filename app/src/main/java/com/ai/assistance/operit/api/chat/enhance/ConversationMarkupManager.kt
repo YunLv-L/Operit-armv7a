@@ -2,6 +2,7 @@ package com.ai.assistance.operit.api.chat.enhance
 
 import android.content.Context
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkParser
 import com.ai.assistance.operit.core.tools.ToolExecutionLimits
 import com.ai.assistance.operit.util.ChatMarkupRegex
 import com.ai.assistance.operit.data.model.ToolResult
@@ -52,12 +53,20 @@ class ConversationMarkupManager {
          */
         fun formatToolResultForMessage(result: ToolResult): String {
             return if (result.success) {
-                createBoundedToolResultXml(
-                    toolName = result.toolName,
-                    status = "success",
-                    rawPayload = result.result.toString()
-                ) { payload ->
-                    "<content>$payload</content>"
+                val (toolPayload, imageLinkPayload) = splitImageLinksForModel(result.result.toString())
+                val toolResultXml =
+                    createBoundedToolResultXml(
+                        toolName = result.toolName,
+                        status = "success",
+                        rawPayload = toolPayload
+                    ) { payload ->
+                        "<content>$payload</content>"
+                    }
+
+                if (imageLinkPayload.isBlank()) {
+                    toolResultXml
+                } else {
+                    "$toolResultXml\n$imageLinkPayload"
                 }
             } else {
                 val errorPayload = buildString {
@@ -79,6 +88,23 @@ class ConversationMarkupManager {
                     "<content><error>$payload</error></content>"
                 }
             }
+        }
+
+        private fun splitImageLinksForModel(rawPayload: String): Pair<String, String> {
+            if (!MediaLinkParser.hasImageLinks(rawPayload)) {
+                return rawPayload to ""
+            }
+
+            val imageLinkPayload =
+                MediaLinkParser.extractImageLinkIds(rawPayload)
+                    .joinToString("\n") { id -> """<link type="image" id="$id"></link>""" }
+            val textPayload = MediaLinkParser.removeImageLinks(rawPayload).trim()
+            val toolPayload =
+                listOf("Image attached as multimodal input.", textPayload)
+                    .filter { it.isNotBlank() }
+                    .joinToString("\n")
+
+            return toolPayload to imageLinkPayload
         }
 
         fun buildBoundedToolResultMessage(results: List<ToolResult>): String {

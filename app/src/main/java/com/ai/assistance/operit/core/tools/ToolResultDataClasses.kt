@@ -2128,7 +2128,9 @@ data class ChatMessagesResultData(
     val chatId: String,
     val order: String,
     val limit: Int,
-    val messages: List<ChatMessageInfo>
+    val messages: List<ChatMessageInfo>,
+    val start: Int? = null,
+    val end: Int? = null,
 ) : ToolResultData() {
 
     @Serializable
@@ -2142,7 +2144,8 @@ data class ChatMessagesResultData(
     )
 
     override fun toString(): String {
-        return "Chat messages: $chatId (order=$order, limit=$limit)\nTotal: ${messages.size}"
+        val rangeInfo = if (start != null && end != null) ", range=$start-$end" else ""
+        return "Chat messages: $chatId (order=$order, limit=$limit$rangeInfo)\nTotal: ${messages.size}"
     }
 }
 

@@ -158,4 +158,11 @@ export namespace Chat {
      * @param options - Optional order/limit
      */
     function getMessages(chatId: string, options?: { order?: 'asc' | 'desc'; limit?: number }): Promise<ChatMessagesResultData>;
+
+    /**
+     * Get messages from a specific chat by zero-based message index range
+     * @param chatId - The ID of the chat to read
+     * @param options - Order and inclusive start/end indexes
+     */
+    function getMessagesRange(chatId: string, options: { order?: 'asc' | 'desc'; start: number; end: number }): Promise<ChatMessagesResultData>;
 }

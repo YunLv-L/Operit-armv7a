@@ -157,6 +157,34 @@ class StandardChatManagerTool(private val context: Context) {
         )
     }
 
+    private fun buildChatMessagesResult(
+        chatId: String,
+        order: String,
+        limit: Int,
+        messages: List<com.ai.assistance.operit.data.model.ChatMessage>,
+        start: Int? = null,
+        end: Int? = null,
+    ): ChatMessagesResultData {
+        val filteredMessages = messages.filterNot { msg -> msg.sender == "summary" }
+        return ChatMessagesResultData(
+            chatId = chatId,
+            order = order,
+            limit = limit,
+            messages = filteredMessages.map { msg ->
+                ChatMessagesResultData.ChatMessageInfo(
+                    sender = msg.sender,
+                    content = simplifyXmlBlocksForHistory(msg.content),
+                    timestamp = msg.timestamp,
+                    roleName = msg.roleName,
+                    provider = msg.provider,
+                    modelName = msg.modelName
+                )
+            },
+            start = start,
+            end = end,
+        )
+    }
+
     suspend fun getChatMessages(tool: AITool): ToolResult {
         return try {
             val chatId = tool.parameters.find { it.name == "chat_id" }?.value?.trim()
@@ -211,26 +239,10 @@ class StandardChatManagerTool(private val context: Context) {
                 limit = effectiveLimit
             )
 
-            val filteredMessages = messages.filterNot { msg -> msg.sender == "summary" }
-
             ToolResult(
                 toolName = tool.name,
                 success = true,
-                result = ChatMessagesResultData(
-                    chatId = chatId,
-                    order = effectiveOrder,
-                    limit = effectiveLimit,
-                    messages = filteredMessages.map { msg ->
-                        ChatMessagesResultData.ChatMessageInfo(
-                            sender = msg.sender,
-                            content = simplifyXmlBlocksForHistory(msg.content),
-                            timestamp = msg.timestamp,
-                            roleName = msg.roleName,
-                            provider = msg.provider,
-                            modelName = msg.modelName
-                        )
-                    }
-                )
+                result = buildChatMessagesResult(chatId, effectiveOrder, effectiveLimit, messages)
             )
         } catch (e: Exception) {
             AppLogger.e(TAG, "Failed to get chat messages", e)
@@ -239,6 +251,113 @@ class StandardChatManagerTool(private val context: Context) {
                 success = false,
                 result = StringResultData(""),
                 error = "Error getting chat messages: ${e.message}"
+            )
+        }
+    }
+
+    suspend fun getChatMessagesRange(tool: AITool): ToolResult {
+        return try {
+            val chatId = tool.parameters.find { it.name == "chat_id" }?.value?.trim()
+            if (chatId.isNullOrBlank()) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Invalid parameter: missing chat_id"
+                )
+            }
+
+            val rawOrder = tool.parameters.find { it.name == "order" }?.value?.trim()
+            val order = rawOrder?.lowercase()?.takeIf { it == "asc" || it == "desc" }
+            if (rawOrder != null && rawOrder.isNotBlank() && order == null) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Invalid parameter: order must be asc/desc"
+                )
+            }
+
+            val rawStart = tool.parameters.find { it.name == "start" }?.value?.trim()
+            val parsedStart = rawStart?.takeIf { it.isNotBlank() }?.toIntOrNull()
+            if (rawStart != null && rawStart.isNotBlank() && parsedStart == null) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Invalid parameter: start must be an integer"
+                )
+            }
+
+            val rawEnd = tool.parameters.find { it.name == "end" }?.value?.trim()
+            val parsedEnd = rawEnd?.takeIf { it.isNotBlank() }?.toIntOrNull()
+            if (rawEnd != null && rawEnd.isNotBlank() && parsedEnd == null) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Invalid parameter: end must be an integer"
+                )
+            }
+
+            if (parsedStart == null || parsedEnd == null) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Invalid parameter: start and end are required"
+                )
+            }
+
+            if (parsedStart < 0 || parsedEnd < parsedStart) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Invalid parameter: range requires 0 <= start <= end"
+                )
+            }
+
+            val effectiveOrder = order ?: "asc"
+            val effectiveLimit = parsedEnd - parsedStart + 1
+
+            val chatHistoryManager = ChatHistoryManager.getInstance(appContext)
+            val title = chatHistoryManager.getChatTitle(chatId)
+            if (title == null) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Chat does not exist: $chatId"
+                )
+            }
+
+            val messages = chatHistoryManager.loadChatMessagesRange(
+                chatId = chatId,
+                order = effectiveOrder,
+                start = parsedStart,
+                end = parsedEnd,
+            )
+
+            ToolResult(
+                toolName = tool.name,
+                success = true,
+                result = buildChatMessagesResult(
+                    chatId = chatId,
+                    order = effectiveOrder,
+                    limit = effectiveLimit,
+                    messages = messages,
+                    start = parsedStart,
+                    end = parsedEnd,
+                )
+            )
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed to get chat messages range", e)
+            ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "Error getting chat messages range: ${e.message}"
             )
         }
     }
