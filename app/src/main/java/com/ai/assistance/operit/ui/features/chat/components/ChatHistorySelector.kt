@@ -91,6 +91,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
@@ -1615,11 +1616,30 @@ fun ChatHistorySelector(
     }
 
     if (showSettingsDialog) {
+        val configuration = LocalConfiguration.current
+        val isCompactDialog =
+            configuration.screenWidthDp < 320 || configuration.screenHeightDp < 560
+        val outerPadding = if (isCompactDialog) 8.dp else 16.dp
+        val contentPadding = if (isCompactDialog) 12.dp else 16.dp
+        val maxDialogHeight = configuration.screenHeightDp.dp - outerPadding * 2
+        val scrollState = rememberScrollState()
+        val cardModifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(outerPadding)
+                .let { base ->
+                    if (isCompactDialog) base.heightIn(max = maxDialogHeight) else base
+                }
+        val contentModifier =
+            Modifier
+                .padding(contentPadding)
+                .let { base ->
+                    if (isCompactDialog) base.verticalScroll(scrollState) else base
+                }
+
         Dialog(onDismissRequest = { showSettingsDialog = false }) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier = cardModifier,
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -1628,9 +1648,7 @@ fun ChatHistorySelector(
                     defaultElevation = 6.dp
                 )
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
+                Column(modifier = contentModifier) {
                     Text(
                         text = stringResource(R.string.chat_history_settings),
                         style = MaterialTheme.typography.headlineSmall,
@@ -2491,4 +2509,3 @@ fun ChatHistorySelector(
         }
     }
 }
-

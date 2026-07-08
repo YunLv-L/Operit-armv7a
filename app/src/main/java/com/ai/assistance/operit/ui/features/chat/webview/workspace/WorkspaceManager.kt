@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
@@ -1236,21 +1237,39 @@ private fun WorkspaceCommandExecutionDialog(
         }
     }
 
+    val configuration = LocalConfiguration.current
+    val isCompactDialog =
+        configuration.screenWidthDp < 320 || configuration.screenHeightDp < 560
+    val outerPadding = if (isCompactDialog) 8.dp else 20.dp
+    val contentPadding = if (isCompactDialog) 16.dp else 20.dp
+    val outputMinHeight = if (isCompactDialog) 96.dp else 180.dp
+    val outputMaxHeight = if (isCompactDialog) 220.dp else 360.dp
+    val maxDialogHeight = configuration.screenHeightDp.dp - outerPadding * 2
+    val surfaceModifier =
+        Modifier
+            .fillMaxWidth()
+            .padding(outerPadding)
+            .let { base ->
+                if (isCompactDialog) {
+                    base.heightIn(max = maxDialogHeight)
+                } else {
+                    base
+                }
+            }
+
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
+            modifier = surfaceModifier,
             shape = RoundedCornerShape(20.dp),
             tonalElevation = 8.dp
         ) {
             Column(
-                modifier = Modifier
+                Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(contentPadding),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
@@ -1282,9 +1301,17 @@ private fun WorkspaceCommandExecutionDialog(
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 180.dp, max = 360.dp),
+                    modifier =
+                        if (isCompactDialog) {
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f, fill = false)
+                                .heightIn(min = outputMinHeight, max = outputMaxHeight)
+                        } else {
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = outputMinHeight, max = outputMaxHeight)
+                        },
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                 ) {

@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,14 +42,23 @@ fun WorkspaceChangeConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val isCompactHeight = screenHeightDp < 560.dp
+    val maxDialogHeight = screenHeightDp * 0.9f
+    val previewMaxHeight = if (isCompactHeight) 120.dp else 260.dp
+    val cardModifier =
+        if (isCompactHeight) {
+            Modifier.fillMaxWidth(0.95f).heightIn(max = maxDialogHeight)
+        } else {
+            Modifier.fillMaxWidth(0.95f).wrapContentHeight()
+        }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .wrapContentHeight(),
+            modifier = cardModifier,
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
@@ -102,7 +112,7 @@ fun WorkspaceChangeConfirmDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 80.dp, max = 260.dp)
+                            .heightIn(min = 80.dp, max = previewMaxHeight)
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                             .padding(horizontal = 8.dp, vertical = 6.dp)

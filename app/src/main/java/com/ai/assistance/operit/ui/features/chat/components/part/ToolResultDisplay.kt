@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -123,12 +124,20 @@ private fun ToolResultDetailDialog(
         onCopy: () -> Unit
 ) {
     val context = LocalContext.current
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val isCompactHeight = screenHeightDp < 560.dp
+    val maxDialogHeight = screenHeightDp * 0.9f
+    val resultMaxHeight = if (isCompactHeight) 160.dp else 300.dp
+    val cardModifier =
+            Modifier.fillMaxWidth().padding(16.dp).let { base ->
+                if (isCompactHeight) base.heightIn(max = maxDialogHeight) else base
+            }
     Dialog(
             onDismissRequest = onDismiss,
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
         Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = cardModifier,
                 shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -183,7 +192,7 @@ private fun ToolResultDetailDialog(
                 Box(
                         modifier =
                                 Modifier.fillMaxWidth()
-                                        .heightIn(min = 50.dp, max = 300.dp)
+                                        .heightIn(min = 50.dp, max = resultMaxHeight)
                                         .verticalScroll(rememberScrollState())
                                         .background(
                                                 color =

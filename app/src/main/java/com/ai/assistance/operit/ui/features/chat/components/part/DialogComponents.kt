@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,13 +46,22 @@ fun ContentDetailDialog(
 ) {
     var isRawView by remember { mutableStateOf(false) }
     val isXmlContent = remember(content) { content.trim().startsWith("<") }
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val isCompactHeight = screenHeightDp < 560.dp
+    val maxDialogHeight = screenHeightDp * 0.9f
+    val contentMaxHeight = if (isCompactHeight) 160.dp else 400.dp
+    val cardModifier =
+        Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .let { base -> if (isCompactHeight) base.heightIn(max = maxDialogHeight) else base }
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = cardModifier,
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -100,7 +110,7 @@ fun ContentDetailDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 50.dp, max = 400.dp) // 增加最大高度
+                        .heightIn(min = 50.dp, max = contentMaxHeight)
                         .background(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             shape = RoundedCornerShape(8.dp)

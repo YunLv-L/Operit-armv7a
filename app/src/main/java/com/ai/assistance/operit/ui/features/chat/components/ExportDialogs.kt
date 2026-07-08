@@ -14,6 +14,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -176,6 +179,22 @@ fun AndroidExportDialog(
     var isVersionNameError by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val isCompactHeight = screenHeightDp < 560.dp
+    val maxDialogHeight = screenHeightDp * 0.9f
+    val compactScrollState = rememberScrollState()
+    val cardModifier =
+            if (isCompactHeight) {
+                Modifier.fillMaxWidth(0.95f).heightIn(max = maxDialogHeight)
+            } else {
+                Modifier.fillMaxWidth(0.95f).wrapContentHeight()
+            }
+    val contentModifier =
+            if (isCompactHeight) {
+                Modifier.padding(20.dp).verticalScroll(compactScrollState)
+            } else {
+                Modifier.padding(20.dp)
+            }
     val imageCropLauncher =
             rememberLauncherForActivityResult(contract = CropImageContract()) { result ->
                 if (result.isSuccessful) {
@@ -201,11 +220,14 @@ fun AndroidExportDialog(
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
     ) {
         Card(
-                modifier = Modifier.fillMaxWidth(0.95f).wrapContentHeight(),
+                modifier = cardModifier,
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.Start) {
+            Column(
+                    modifier = contentModifier,
+                    horizontalAlignment = Alignment.Start
+            ) {
                 Text(
                         context.getString(R.string.configure_android_app),
                         style = MaterialTheme.typography.headlineSmall,
@@ -399,6 +421,22 @@ fun WindowsExportDialog(
     var iconUri by remember { mutableStateOf<Uri?>(null) }
 
     val context = LocalContext.current
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val isCompactHeight = screenHeightDp < 560.dp
+    val maxDialogHeight = screenHeightDp * 0.9f
+    val compactScrollState = rememberScrollState()
+    val cardModifier =
+            if (isCompactHeight) {
+                Modifier.fillMaxWidth(0.95f).heightIn(max = maxDialogHeight)
+            } else {
+                Modifier.fillMaxWidth(0.95f).wrapContentHeight()
+            }
+    val contentModifier =
+            if (isCompactHeight) {
+                Modifier.padding(20.dp).verticalScroll(compactScrollState)
+            } else {
+                Modifier.padding(20.dp)
+            }
     val imageCropLauncher =
             rememberLauncherForActivityResult(contract = CropImageContract()) { result ->
                 if (result.isSuccessful) {
@@ -425,11 +463,14 @@ fun WindowsExportDialog(
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
     ) {
         Card(
-                modifier = Modifier.fillMaxWidth(0.95f).wrapContentHeight(),
+                modifier = cardModifier,
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.Start) {
+            Column(
+                    modifier = contentModifier,
+                    horizontalAlignment = Alignment.Start
+            ) {
                 Text(
                         context.getString(R.string.configure_windows_app),
                         style = MaterialTheme.typography.headlineSmall,

@@ -3,6 +3,8 @@ package com.ai.assistance.operit.ui.features.chat.components
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -32,6 +35,21 @@ fun LinkPreviewDialog(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isCompactWidth = configuration.screenWidthDp < 360
+    val isCompactHeight = configuration.screenHeightDp < 560
+    val needsCompactFallback = isCompactWidth || isCompactHeight
+    val maxDialogHeight = configuration.screenHeightDp.dp * 0.9f
+    val scrollState = rememberScrollState()
+    val surfaceModifier =
+        if (needsCompactFallback) modifier.heightIn(max = maxDialogHeight) else modifier
+    val contentModifier =
+        Modifier
+            .padding(if (isCompactWidth) 16.dp else 24.dp)
+            .fillMaxWidth()
+            .let { base ->
+                if (needsCompactFallback) base.verticalScroll(scrollState) else base
+            }
     
     Dialog(
         onDismissRequest = onDismiss,
@@ -41,15 +59,13 @@ fun LinkPreviewDialog(
         )
     ) {
         Surface(
-            modifier = modifier,
+            modifier = surfaceModifier,
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp
         ) {
             Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .fillMaxWidth(),
+                modifier = contentModifier,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // 标题
@@ -90,62 +106,97 @@ fun LinkPreviewDialog(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 // 按钮区域
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // 取消按钮
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Cancel,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(context.getString(R.string.cancel))
+                val openLink = {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse(url)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+
+                        // 检查是否有应用可以处理这个Intent
+                        val packageManager = context.packageManager
+                        if (intent.resolveActivity(packageManager) != null) {
+                            context.startActivity(intent)
+                            onDismiss()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.no_app_found),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.open_link_failed, e.message ?: context.getString(R.string.unknown_error)),
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
-                    
-                    // 访问按钮
-                    Button(
-                        onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    data = Uri.parse(url)
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                
-                                // 检查是否有应用可以处理这个Intent
-                                val packageManager = context.packageManager
-                                if (intent.resolveActivity(packageManager) != null) {
-                                    context.startActivity(intent)
-                                    onDismiss()
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.no_app_found),
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.open_link_failed, e.message ?: context.getString(R.string.unknown_error)),
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
+                }
+
+                if (isCompactWidth) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.OpenInBrowser,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(context.getString(R.string.visit))
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Cancel,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(context.getString(R.string.cancel))
+                        }
+
+                        Button(
+                            onClick = openLink,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OpenInBrowser,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(context.getString(R.string.visit))
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // 取消按钮
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Cancel,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(context.getString(R.string.cancel))
+                        }
+
+                        // 访问按钮
+                        Button(
+                            onClick = openLink,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OpenInBrowser,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(context.getString(R.string.visit))
+                        }
                     }
                 }
                 
@@ -161,4 +212,4 @@ fun LinkPreviewDialog(
             }
         }
     }
-} 
+}
