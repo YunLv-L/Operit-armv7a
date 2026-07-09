@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
@@ -56,6 +55,7 @@ import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRenderer
 import com.ai.assistance.operit.ui.common.rememberLocal
+import com.ai.assistance.operit.ui.features.chat.components.rememberCompactDialogMetrics
 import com.ai.assistance.operit.ui.features.chat.components.attachments.AudioAttachmentPlayer
 import com.ai.assistance.operit.ui.features.chat.components.attachments.VideoAttachmentPlayer
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
@@ -1237,21 +1237,18 @@ private fun WorkspaceCommandExecutionDialog(
         }
     }
 
-    val configuration = LocalConfiguration.current
-    val isCompactDialog =
-        configuration.screenWidthDp < 320 || configuration.screenHeightDp < 560
-    val outerPadding = if (isCompactDialog) 8.dp else 20.dp
-    val contentPadding = if (isCompactDialog) 16.dp else 20.dp
-    val outputMinHeight = if (isCompactDialog) 96.dp else 180.dp
-    val outputMaxHeight = if (isCompactDialog) 220.dp else 360.dp
-    val maxDialogHeight = configuration.screenHeightDp.dp - outerPadding * 2
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val outerPadding = if (dialogMetrics.isCompact) 8.dp else 20.dp
+    val contentPadding = if (dialogMetrics.isCompact) 16.dp else 20.dp
+    val outputMinHeight = if (dialogMetrics.isCompact) 96.dp else 180.dp
+    val outputMaxHeight = if (dialogMetrics.isCompact) 220.dp else 360.dp
     val surfaceModifier =
         Modifier
             .fillMaxWidth()
             .padding(outerPadding)
             .let { base ->
-                if (isCompactDialog) {
-                    base.heightIn(max = maxDialogHeight)
+                if (dialogMetrics.isCompact) {
+                    base.heightIn(max = dialogMetrics.maxHeight - outerPadding * 2)
                 } else {
                     base
                 }
@@ -1302,7 +1299,7 @@ private fun WorkspaceCommandExecutionDialog(
                 }
                 Surface(
                     modifier =
-                        if (isCompactDialog) {
+                        if (dialogMetrics.isCompact) {
                             Modifier
                                 .fillMaxWidth()
                                 .weight(1f, fill = false)

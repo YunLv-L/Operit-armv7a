@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -179,22 +178,16 @@ fun AndroidExportDialog(
     var isVersionNameError by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val isCompactHeight = screenHeightDp < 560.dp
-    val maxDialogHeight = screenHeightDp * 0.9f
-    val compactScrollState = rememberScrollState()
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val compactScrollState = rememberCompactDialogScrollState()
     val cardModifier =
-            if (isCompactHeight) {
-                Modifier.fillMaxWidth(0.95f).heightIn(max = maxDialogHeight)
-            } else {
-                Modifier.fillMaxWidth(0.95f).wrapContentHeight()
-            }
+            Modifier
+                    .fillMaxWidth(0.95f)
+                    .compactDialogHeightOrWrapContent(dialogMetrics)
     val contentModifier =
-            if (isCompactHeight) {
-                Modifier.padding(20.dp).verticalScroll(compactScrollState)
-            } else {
-                Modifier.padding(20.dp)
-            }
+            Modifier
+                    .padding(20.dp)
+                    .verticalScrollWhenShort(dialogMetrics, compactScrollState)
     val imageCropLauncher =
             rememberLauncherForActivityResult(contract = CropImageContract()) { result ->
                 if (result.isSuccessful) {
@@ -421,22 +414,16 @@ fun WindowsExportDialog(
     var iconUri by remember { mutableStateOf<Uri?>(null) }
 
     val context = LocalContext.current
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val isCompactHeight = screenHeightDp < 560.dp
-    val maxDialogHeight = screenHeightDp * 0.9f
-    val compactScrollState = rememberScrollState()
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val compactScrollState = rememberCompactDialogScrollState()
     val cardModifier =
-            if (isCompactHeight) {
-                Modifier.fillMaxWidth(0.95f).heightIn(max = maxDialogHeight)
-            } else {
-                Modifier.fillMaxWidth(0.95f).wrapContentHeight()
-            }
+            Modifier
+                    .fillMaxWidth(0.95f)
+                    .compactDialogHeightOrWrapContent(dialogMetrics)
     val contentModifier =
-            if (isCompactHeight) {
-                Modifier.padding(20.dp).verticalScroll(compactScrollState)
-            } else {
-                Modifier.padding(20.dp)
-            }
+            Modifier
+                    .padding(20.dp)
+                    .verticalScrollWhenShort(dialogMetrics, compactScrollState)
     val imageCropLauncher =
             rememberLauncherForActivityResult(contract = CropImageContract()) { result ->
                 if (result.isSuccessful) {

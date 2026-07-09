@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -26,6 +25,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import com.ai.assistance.operit.R
 import androidx.compose.ui.window.DialogProperties
+import com.ai.assistance.operit.ui.features.chat.components.compactDialogHeightWhenShort
+import com.ai.assistance.operit.ui.features.chat.components.rememberCompactDialogMetrics
 
 /**
  * 通用的内容详情弹窗
@@ -46,15 +47,13 @@ fun ContentDetailDialog(
 ) {
     var isRawView by remember { mutableStateOf(false) }
     val isXmlContent = remember(content) { content.trim().startsWith("<") }
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val isCompactHeight = screenHeightDp < 560.dp
-    val maxDialogHeight = screenHeightDp * 0.9f
-    val contentMaxHeight = if (isCompactHeight) 160.dp else 400.dp
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val contentMaxHeight = if (dialogMetrics.isCompactHeight) 160.dp else 400.dp
     val cardModifier =
         Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .let { base -> if (isCompactHeight) base.heightIn(max = maxDialogHeight) else base }
+            .compactDialogHeightWhenShort(dialogMetrics)
 
     Dialog(
         onDismissRequest = onDismiss,

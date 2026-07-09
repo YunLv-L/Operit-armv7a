@@ -20,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,16 +41,12 @@ fun WorkspaceChangeConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val isCompactHeight = screenHeightDp < 560.dp
-    val maxDialogHeight = screenHeightDp * 0.9f
-    val previewMaxHeight = if (isCompactHeight) 120.dp else 260.dp
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val previewMaxHeight = if (dialogMetrics.isCompactHeight) 120.dp else 260.dp
     val cardModifier =
-        if (isCompactHeight) {
-            Modifier.fillMaxWidth(0.95f).heightIn(max = maxDialogHeight)
-        } else {
-            Modifier.fillMaxWidth(0.95f).wrapContentHeight()
-        }
+        Modifier
+            .fillMaxWidth(0.95f)
+            .compactDialogHeightOrWrapContent(dialogMetrics)
 
     Dialog(
         onDismissRequest = onDismiss,

@@ -14,7 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -35,21 +34,15 @@ fun LinkPreviewDialog(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
-    val isCompactWidth = configuration.screenWidthDp < 360
-    val isCompactHeight = configuration.screenHeightDp < 560
-    val needsCompactFallback = isCompactWidth || isCompactHeight
-    val maxDialogHeight = configuration.screenHeightDp.dp * 0.9f
-    val scrollState = rememberScrollState()
+    val dialogMetrics = rememberCompactDialogMetrics(compactWidthThreshold = 360)
+    val scrollState = rememberCompactDialogScrollState()
     val surfaceModifier =
-        if (needsCompactFallback) modifier.heightIn(max = maxDialogHeight) else modifier
+        modifier.compactDialogHeight(dialogMetrics)
     val contentModifier =
         Modifier
-            .padding(if (isCompactWidth) 16.dp else 24.dp)
+            .padding(if (dialogMetrics.isCompactWidth) 16.dp else 24.dp)
             .fillMaxWidth()
-            .let { base ->
-                if (needsCompactFallback) base.verticalScroll(scrollState) else base
-            }
+            .verticalScrollWhenCompact(dialogMetrics, scrollState)
     
     Dialog(
         onDismissRequest = onDismiss,
@@ -134,7 +127,7 @@ fun LinkPreviewDialog(
                     }
                 }
 
-                if (isCompactWidth) {
+                if (dialogMetrics.isCompactWidth) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)

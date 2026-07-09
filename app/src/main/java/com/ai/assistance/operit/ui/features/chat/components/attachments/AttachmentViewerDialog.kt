@@ -42,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -53,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.ui.features.chat.components.compactDialogHeightWhenShort
+import com.ai.assistance.operit.ui.features.chat.components.rememberCompactDialogMetrics
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.ImageBitmapLimiter
 import com.ai.assistance.operit.util.MediaBase64Limiter
@@ -81,10 +82,8 @@ fun AttachmentViewerDialog(
 
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val isCompactHeight = screenHeightDp < 560.dp
-    val maxDialogHeight = if (isCompactHeight) screenHeightDp * 0.9f else 520.dp
-    val mediaMaxHeight = if (isCompactHeight) 220.dp else 500.dp
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val mediaMaxHeight = if (dialogMetrics.isCompactHeight) 220.dp else 500.dp
 
     val isImage = attachment.mimeType.startsWith("image/")
     val isAudio = attachment.mimeType.startsWith("audio/")
@@ -190,7 +189,7 @@ fun AttachmentViewerDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = maxDialogHeight),
+                .compactDialogHeightWhenShort(dialogMetrics, defaultMaxHeight = 520.dp),
             shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 4.dp
@@ -284,8 +283,8 @@ fun AttachmentViewerDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(
-                                        min = if (isCompactHeight) 120.dp else 180.dp,
-                                        max = if (isCompactHeight) 220.dp else 420.dp
+                                        min = if (dialogMetrics.isCompactHeight) 120.dp else 180.dp,
+                                        max = if (dialogMetrics.isCompactHeight) 220.dp else 420.dp
                                     ),
                                 autoPlay = false
                             )

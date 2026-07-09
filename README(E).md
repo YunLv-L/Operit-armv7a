@@ -88,7 +88,7 @@ Customize AI personality and speaking style, with character card backup/export (
 | ⚙️ **System Operations** | App installation, permission management, UI automation via Accessibility / ADB / Root (includes AutoGLM auto-click agent, supports adb root virtual display / multi-display) |
 | 🎬 **Media Processing** | Video conversion, frame extraction, OCR/vision understanding, camera capture, audio/video reading |
 | 🧑‍💻 **Developer & Terminal** | Web workspace/one-click packaging, code editing/syntax highlight, terminal SSH/Chroot/vim, Ctrl shortcuts |
-| 🎨 **AI Creation** | Drawing toolkits (OpenAI/Qwen/NanoBanana), image search/download |
+| 🎨 **AI Creation** | Drawing toolkits (OpenAI/Qwen/NanoBanana/Zhipu), image search/download |
 | 🔍 **Search Engines** | Deep search, DuckDuckGo, Tavily, Google Scholar, Bing, Sogou, Quark, Baidu Maps |
 | 🧩 **Toolkits & Workflows** | Toolkit ecosystem/package management, workflow automation, scheduled triggers, voice wake-up triggers |
 
@@ -114,7 +114,7 @@ Customize AI personality and speaking style, with character card backup/export (
 
 - 🤖 **Tasker Integration**: Trigger custom AI agent events for deep automation
 - 🌐 **MCP/Skill Marketplace**: One-click plugin installation, remote MCP, auto-description, uvx/npx support
-- 🔌 **Multi-Model Support**: OpenAI, Claude, Gemini, Bailing, OpenRouter, LMStudio
+- 🔌 **Multi-Model Support**: OpenAI Responses API, Claude, Gemini, xAI, Novita, Ollama, NVIDIA, OpenRouter, LMStudio, Bailing, and more
 - 🧪 **Model & Prompt Management**: Multi configs/param customization, prompt marketplace
 - 🔐 **Permissions**: Per-tool authorization and safety prompts
 - 🔑 **Key Pool & Stats**: Batch test/import, token usage stats
@@ -175,7 +175,7 @@ Rich MCP ecosystem
 
 | Item | Description |
 |------|-------------|
-| 📋 **System Requirements** | Android 8.0+ (API 26+), 4GB+ RAM recommended, 200MB+ storage |
+| 📋 **System Requirements** | Android 8.0+ (API 26+), 6GB+ RAM recommended, 5GB+ free storage |
 | 📥 **Download & Install** | Download the latest APK from the [Release Page](https://github.com/AAswordman/Operit/releases) |
 | 📖 **User Guide** | [Complete Documentation](https://aaswordman.github.io/OperitWeb) with detailed tutorials and examples |
 
@@ -200,7 +200,29 @@ Rich MCP ecosystem
 <tr><th>Version</th><th>Release Date</th><th>Core Updates</th></tr>
 
 <tr>
-<td><b>v1.10.1</b><br><sub>Latest</sub></td>
+<td><b>v1.12.0</b><br><sub>Latest</sub></td>
+<td>2026-07-01</td>
+<td>
+• <b>Marketplace & Creation Ecosystem</b>: Unified marketplace flows, added the Artifact marketplace, project management and publishing, and improved marketplace search, GitHub OAuth login, example repositories, and sidebar entry points<br>
+• <b>Toolkits & Workspaces</b>: Extracted ToolPkg IPC/runtime management, added the hook runner, plan-mode runtime IPC, workspace change tracking/attachments/templates, and the zip include_root_directory option<br>
+• <b>Languages, Voice & Media</b>: Added Korean, Spanish, and Portuguese localization; introduced MIMO/Mimo, VITS, ONNX, and Doubao TTS, music playback queues, better image attachments, and attachment filename deduplication<br>
+• <b>Stability & Security</b>: Removed the hardcoded default DeepSeek API key, added crash-repair recovery and startup isolation, and fixed model-provider display names, button text overflow, cloud embedding endpoint validation, DashScope audio recognition, and related issues
+</td>
+</tr>
+
+<tr>
+<td><b>v1.11.0</b></td>
+<td>2026-05-16</td>
+<td>
+• <b>Web Chat & Artifact Marketplace</b>: Added Web Chat and the Artifact marketplace with model selection, history navigation, project management, publishing, and migration of the problem library into the memory library system<br>
+• <b>Toolkits, Hooks & Compose DSL</b>: Added the ToolPkg AI provider, per-turn chat controls, tool hook interception and runners, plus Compose DSL WebView, slot, debug dump, and rerender support<br>
+• <b>Memory, Context & History</b>: Added memory auto-save from selected user messages, scheduled auto-save, WorldBook search/refresh, context limiting, history-window paging, and message locator previews<br>
+• <b>Development & Automation</b>: Improved browser iframe snapshots/clicks, GitHub notification management, the QQ Bot example, file picker APIs, Java Bridge tests, remote/Windows setup screens, and desktop widgets
+</td>
+</tr>
+
+<tr>
+<td><b>v1.10.1</b></td>
 <td>2026-04-17</td>
 <td>
 • <b>In-App Browser & Web Automation</b>: Greatly expanded the built-in browser with tabs, history, bookmarks, permissions, multi-window support, minimization, and viewport control, plus browser-script import, install, storage, runtime, and page-menu support<br>

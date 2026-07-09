@@ -91,7 +91,6 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
@@ -1616,26 +1615,25 @@ fun ChatHistorySelector(
     }
 
     if (showSettingsDialog) {
-        val configuration = LocalConfiguration.current
-        val isCompactDialog =
-            configuration.screenWidthDp < 320 || configuration.screenHeightDp < 560
-        val outerPadding = if (isCompactDialog) 8.dp else 16.dp
-        val contentPadding = if (isCompactDialog) 12.dp else 16.dp
-        val maxDialogHeight = configuration.screenHeightDp.dp - outerPadding * 2
-        val scrollState = rememberScrollState()
+        val dialogMetrics = rememberCompactDialogMetrics()
+        val outerPadding = if (dialogMetrics.isCompact) 8.dp else 16.dp
+        val contentPadding = if (dialogMetrics.isCompact) 12.dp else 16.dp
+        val scrollState = rememberCompactDialogScrollState()
         val cardModifier =
             Modifier
                 .fillMaxWidth()
                 .padding(outerPadding)
                 .let { base ->
-                    if (isCompactDialog) base.heightIn(max = maxDialogHeight) else base
+                    if (dialogMetrics.isCompact) {
+                        base.heightIn(max = dialogMetrics.maxHeight - outerPadding * 2)
+                    } else {
+                        base
+                    }
                 }
         val contentModifier =
             Modifier
                 .padding(contentPadding)
-                .let { base ->
-                    if (isCompactDialog) base.verticalScroll(scrollState) else base
-                }
+                .verticalScrollWhenCompact(dialogMetrics, scrollState)
 
         Dialog(onDismissRequest = { showSettingsDialog = false }) {
             Card(

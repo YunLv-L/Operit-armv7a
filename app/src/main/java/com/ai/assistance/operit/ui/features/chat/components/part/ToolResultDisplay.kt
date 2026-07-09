@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -26,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.ui.features.chat.components.compactDialogHeightWhenShort
+import com.ai.assistance.operit.ui.features.chat.components.rememberCompactDialogMetrics
 
 /** 工具执行结果显示组件 简洁风格，显示工具执行结果，无边框，与CompactToolDisplay风格一致 通过缩进和特殊图标区分工具调用和执行结果 支持点击查看详细内容 */
 @Composable
@@ -124,14 +125,10 @@ private fun ToolResultDetailDialog(
         onCopy: () -> Unit
 ) {
     val context = LocalContext.current
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val isCompactHeight = screenHeightDp < 560.dp
-    val maxDialogHeight = screenHeightDp * 0.9f
-    val resultMaxHeight = if (isCompactHeight) 160.dp else 300.dp
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val resultMaxHeight = if (dialogMetrics.isCompactHeight) 160.dp else 300.dp
     val cardModifier =
-            Modifier.fillMaxWidth().padding(16.dp).let { base ->
-                if (isCompactHeight) base.heightIn(max = maxDialogHeight) else base
-            }
+            Modifier.fillMaxWidth().padding(16.dp).compactDialogHeightWhenShort(dialogMetrics)
     Dialog(
             onDismissRequest = onDismiss,
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
