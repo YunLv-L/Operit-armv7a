@@ -327,8 +327,11 @@ object MessageImageGenerator {
                         width,
                         ViewGroup.LayoutParams.WRAP_CONTENT
                     ))
+                    // 平移到屏幕宽度之外，而不是 INVISIBLE 或裁剪掉：ScrollView 仍以正常尺寸
+                    // 挂在 rootView 下参与真实绘制流程，Compose 才会在背景图异步加载完成后正常重绘；
+                    translationX = context.resources.displayMetrics.widthPixels.toFloat() + width
                 }
-                
+
                 // 设置 ScrollView 布局参数
                 scrollView.layoutParams = ViewGroup.LayoutParams(
                     width,
