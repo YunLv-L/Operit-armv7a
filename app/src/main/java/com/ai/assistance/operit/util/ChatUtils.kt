@@ -21,11 +21,25 @@ object ChatUtils {
         }
     }
 
+    fun stripOpenAiResponsesReasoningMeta(content: String): String {
+        return ChatMarkupRegex.removeOpenAiResponsesReasoningMeta(content)
+    }
+
+    fun stripOpenAiResponsesReasoningMetaTurns(messages: List<PromptTurn>): List<PromptTurn> {
+        return messages.map { turn ->
+            turn.withContent(stripOpenAiResponsesReasoningMeta(turn.content))
+        }
+    }
+
     fun isGeminiProviderModel(providerModel: String): Boolean {
         return when (providerModel.substringBefore(":").uppercase()) {
             "GOOGLE", "GEMINI_GENERIC" -> true
             else -> false
         }
+    }
+
+    fun isOpenAIResponsesProviderModel(providerModel: String): Boolean {
+        return providerModel.substringBefore(":").uppercase() == "OPENAI_RESPONSES"
     }
 
     /** 过滤掉内容中的思考部分和搜索来源 移除<think></think>、<thinking></thinking>和<search></search>标签及其中的内容，并处理未闭合的情况 */

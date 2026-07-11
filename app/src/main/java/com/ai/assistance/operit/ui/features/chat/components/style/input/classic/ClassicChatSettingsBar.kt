@@ -56,7 +56,6 @@ import androidx.compose.ui.window.PopupProperties
 import android.widget.Toast
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.api.chat.library.MemoryAutoSaveScheduler
-import com.ai.assistance.operit.api.chat.llmprovider.OpenAiGpt56Reasoning
 import com.ai.assistance.operit.data.model.CharacterCardChatModelBindingMode
 import com.ai.assistance.operit.data.model.CharacterCardMemoryProfileBindingMode
 import com.ai.assistance.operit.data.model.FunctionType
@@ -225,10 +224,7 @@ fun ClassicChatSettingsBar(
             val validIndex = getValidModelIndex(config.modelName, effectiveCurrentConfigMapping.modelIndex)
             getModelByIndex(config.modelName, validIndex).ifEmpty { stringResource(R.string.not_selected) }
         } ?: stringResource(R.string.not_selected)
-    val maxThinkingQualityLevel = OpenAiGpt56Reasoning.maxQualityLevel(
-        currentConfig?.apiProviderType,
-        currentModelName
-    )
+    val maxThinkingQualityLevel = ApiPreferences.MAX_THINKING_QUALITY_LEVEL
     val toolPermissionText =
         when (if (enableTools) permissionLevel else PermissionLevel.FORBID) {
             PermissionLevel.FORBID -> stringResource(R.string.agent_menu_permission_disabled)

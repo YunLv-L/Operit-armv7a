@@ -123,7 +123,10 @@ class ConversationService(
             if (!customRules.isNullOrBlank()) {
                 systemPrompt += "\n\n${customRules.trim()}"
             }
-            val sanitizedMessages = ChatUtils.stripGeminiThoughtSignatureMetaTurns(messages)
+            val sanitizedMessages =
+                ChatUtils.stripOpenAiResponsesReasoningMetaTurns(
+                    ChatUtils.stripGeminiThoughtSignatureMetaTurns(messages)
+                )
 
             // Get all model parameters from preferences (with enabled state)
             val modelParameters = multiServiceManager.getModelParametersForFunction(FunctionType.SUMMARY)

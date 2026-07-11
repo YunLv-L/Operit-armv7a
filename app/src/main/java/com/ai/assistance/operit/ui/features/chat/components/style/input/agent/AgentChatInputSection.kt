@@ -109,7 +109,6 @@ import androidx.compose.ui.window.PopupProperties
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.api.chat.library.MemoryAutoSaveScheduler
-import com.ai.assistance.operit.api.chat.llmprovider.OpenAiGpt56Reasoning
 import com.ai.assistance.operit.core.tools.ToolProgressBus
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatMessage
@@ -1525,10 +1524,7 @@ private fun AgentModelSelectorPopup(
         val validIndex = getValidModelIndex(config.modelName, currentConfigMapping.modelIndex)
         getModelByIndex(config.modelName, validIndex)
     }.orEmpty()
-    val maxThinkingQualityLevel = OpenAiGpt56Reasoning.maxQualityLevel(
-        currentConfig?.apiProviderType,
-        currentModelName
-    )
+    val maxThinkingQualityLevel = ApiPreferences.MAX_THINKING_QUALITY_LEVEL
 
     Popup(
         alignment = Alignment.TopStart,

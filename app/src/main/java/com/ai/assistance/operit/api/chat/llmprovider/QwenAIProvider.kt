@@ -155,14 +155,12 @@ class QwenAIProvider(
             return null
         }
 
-        val requestedBudget =
-            when (qualityLevel.coerceIn(1, 4)) {
-                1 -> null
-                2 -> 4_096
-                3 -> 8_192
-                4 -> 16_384
-                else -> null
-            }
+        val thinkingBudgets = listOf(null, 4_096, 8_192, 16_384, 32_768)
+        val qualityIndex = qualityLevel.coerceIn(
+            ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+            ApiPreferences.MAX_THINKING_QUALITY_LEVEL
+        ) - 1
+        val requestedBudget = thinkingBudgets[qualityIndex]
 
         if (requestedBudget == null) {
             return null

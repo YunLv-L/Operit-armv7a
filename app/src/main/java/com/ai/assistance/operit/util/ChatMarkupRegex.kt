@@ -5,6 +5,7 @@ import java.security.SecureRandom
 object ChatMarkupRegex {
     private const val TOOL_TAG_SUFFIX_REGEX_SOURCE = "[A-Za-z0-9_]+"
     private const val GEMINI_THOUGHT_SIGNATURE_PROVIDER = "gemini:thought_signature"
+    private const val OPENAI_RESPONSES_REASONING_PROVIDER = "openai:responses_reasoning"
     const val TOOL_TAG_NAME_REGEX_SOURCE =
         "tool(?:_(?!result(?:_|$))$TOOL_TAG_SUFFIX_REGEX_SOURCE)?"
     const val TOOL_RESULT_TAG_NAME_REGEX_SOURCE = "tool_result(?:_${TOOL_TAG_SUFFIX_REGEX_SOURCE})?"
@@ -237,6 +238,10 @@ object ChatMarkupRegex {
         return """<meta provider="$GEMINI_THOUGHT_SIGNATURE_PROVIDER">$signatureBase64</meta>"""
     }
 
+    fun openAiResponsesReasoningMetaTag(payloadBase64: String): String {
+        return """<meta provider="$OPENAI_RESPONSES_REASONING_PROVIDER">$payloadBase64</meta>"""
+    }
+
     fun extractGeminiThoughtSignature(content: String): String? {
         return metaTag.findAll(content)
             .mapNotNull { match ->
@@ -254,11 +259,42 @@ object ChatMarkupRegex {
             .lastOrNull()
     }
 
+    fun extractOpenAiResponsesReasoningPayloads(content: String): List<String> {
+        return metaTag.findAll(content)
+            .mapNotNull { match ->
+                val tagContent = match.value
+                val provider = metaProviderAttrRegex.find(tagContent)?.groupValues?.getOrNull(1)
+                if (!provider.equals(OPENAI_RESPONSES_REASONING_PROVIDER, ignoreCase = true)) {
+                    return@mapNotNull null
+                }
+                metaBodyRegex.find(tagContent)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+            }
+            .toList()
+    }
+
     fun removeGeminiThoughtSignatureMeta(content: String): String {
         var removed = false
         val result = metaTag.replace(content) { match ->
             val provider = metaProviderAttrRegex.find(match.value)?.groupValues?.getOrNull(1)
             if (provider.equals(GEMINI_THOUGHT_SIGNATURE_PROVIDER, ignoreCase = true)) {
+                removed = true
+                ""
+            } else {
+                match.value
+            }
+        }
+        return if (removed) result.trimEnd() else result
+    }
+
+    fun removeOpenAiResponsesReasoningMeta(content: String): String {
+        var removed = false
+        val result = metaTag.replace(content) { match ->
+            val provider = metaProviderAttrRegex.find(match.value)?.groupValues?.getOrNull(1)
+            if (provider.equals(OPENAI_RESPONSES_REASONING_PROVIDER, ignoreCase = true)) {
                 removed = true
                 ""
             } else {

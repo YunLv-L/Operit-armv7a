@@ -452,11 +452,12 @@ class DeepseekProvider(
             return null
         }
 
-        return when (qualityLevel.coerceIn(1, 4)) {
-            1, 2 -> "high"
-            3, 4 -> "max"
-            else -> null
-        }
+        val efforts = listOf("high", "high", "max", "max", "max")
+        val qualityIndex = qualityLevel.coerceIn(
+            ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+            ApiPreferences.MAX_THINKING_QUALITY_LEVEL
+        ) - 1
+        return efforts[qualityIndex]
     }
 
     override suspend fun sendMessage(

@@ -1,12 +1,15 @@
 package com.ai.assistance.operit.api.chat.llmprovider
 
 import android.content.Context
+import android.util.Base64
 import com.ai.assistance.operit.core.chat.hooks.PromptTurn
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.ToolPrompt
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.util.AppLogger
+import com.ai.assistance.operit.util.ChatMarkupRegex
+import com.ai.assistance.operit.util.ChatUtils
 import java.security.MessageDigest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -49,9 +52,15 @@ class OpenAIResponsesProvider(
         availableTools: List<ToolPrompt>?,
         preserveThinkInHistory: Boolean
     ): RequestBody {
+        val requestChatHistory =
+            if (enableThinking) {
+                chatHistory
+            } else {
+                ChatUtils.stripOpenAiResponsesReasoningMetaTurns(chatHistory)
+            }
         val baseRequestBodyJson = super.createRequestBodyInternal(
             context,
-            chatHistory,
+            requestChatHistory,
             modelParameters,
             stream,
             availableTools,
@@ -103,9 +112,8 @@ class OpenAIResponsesProvider(
         requestJson: JSONObject,
         enableThinking: Boolean
     ) {
-        val isGpt56 = usesGpt56Model()
         val reasoningObject = requestJson.optJSONObject("reasoning")
-        if (!enableThinking && reasoningObject == null && !isGpt56) {
+        if (!enableThinking && reasoningObject == null) {
             return
         }
 
@@ -123,8 +131,7 @@ class OpenAIResponsesProvider(
         if (existingEffort == null) {
             val effort = when {
                 enableThinking -> resolveResponsesReasoningEffort(context)
-                isGpt56 -> "none"
-                else -> null
+                else -> "none"
             }
             if (effort != null) {
                 finalReasoningObject.put("effort", effort)
@@ -151,6 +158,21 @@ class OpenAIResponsesProvider(
         }
 
         requestJson.put("reasoning", finalReasoningObject)
+        if (finalReasoningObject.optString("effort", "").trim() != "none") {
+            ensureResponsesReasoningEncryptedContentIncluded(requestJson)
+        }
+    }
+
+    private fun ensureResponsesReasoningEncryptedContentIncluded(requestJson: JSONObject) {
+        val includeArray = requestJson.optJSONArray("include") ?: JSONArray().also {
+            requestJson.put("include", it)
+        }
+        for (i in 0 until includeArray.length()) {
+            if (includeArray.optString(i, "") == "reasoning.encrypted_content") {
+                return
+            }
+        }
+        includeArray.put("reasoning.encrypted_content")
     }
 
     private fun resolveResponsesReasoningEffort(context: Context): String? {
@@ -167,21 +189,13 @@ class OpenAIResponsesProvider(
             return null
         }
 
-        return if (usesGpt56Model()) {
-            OpenAiGpt56Reasoning.effortForQualityLevel(qualityLevel)
-        } else {
-            when (qualityLevel.coerceIn(1, 4)) {
-                1 -> "low"
-                2 -> "medium"
-                3 -> "high"
-                4 -> "xhigh"
-                else -> null
-            }
-        }
+        val effortLevels = listOf("low", "medium", "high", "xhigh", "max")
+        val qualityIndex = qualityLevel.coerceIn(
+            ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+            ApiPreferences.MAX_THINKING_QUALITY_LEVEL
+        ) - 1
+        return effortLevels[qualityIndex]
     }
-
-    private fun usesGpt56Model(): Boolean =
-        OpenAiGpt56Reasoning.supportsResponses(responsesProviderType, modelName)
 
     private fun shouldAttachPromptCacheKey(): Boolean {
         return responsesProviderType == ApiProviderType.OPENAI_RESPONSES
@@ -264,6 +278,7 @@ object OpenAIResponsesPayloadAdapter {
     data class ParsedResponseOutput(
         val textChunks: List<String>,
         val reasoningChunks: List<String>,
+        val reasoningMetadataTags: List<String>,
         val reasoningObserved: Boolean,
         val toolCalls: JSONArray,
         val usage: UsageCounts?
@@ -354,6 +369,7 @@ object OpenAIResponsesPayloadAdapter {
     fun parseNonStreamingResponse(jsonResponse: JSONObject): ParsedResponseOutput {
         val textChunks = mutableListOf<String>()
         val reasoningChunks = mutableListOf<String>()
+        val reasoningMetadataTags = mutableListOf<String>()
         val toolCalls = JSONArray()
         var reasoningObserved = false
 
@@ -388,6 +404,7 @@ object OpenAIResponsesPayloadAdapter {
 
                     "reasoning" -> {
                         reasoningObserved = true
+                        createReasoningMetadataTag(item)?.let { reasoningMetadataTags.add(it) }
                         val summaryArray = item.optJSONArray("summary")
                         if (summaryArray != null) {
                             for (j in 0 until summaryArray.length()) {
@@ -413,6 +430,7 @@ object OpenAIResponsesPayloadAdapter {
         return ParsedResponseOutput(
             textChunks = textChunks,
             reasoningChunks = reasoningChunks,
+            reasoningMetadataTags = reasoningMetadataTags,
             reasoningObserved = reasoningObserved,
             toolCalls = toolCalls,
             usage = parseUsageCounts(jsonResponse.optJSONObject("usage"))
@@ -480,6 +498,7 @@ object OpenAIResponsesPayloadAdapter {
             }
 
             if (role == "assistant") {
+                appendReasoningItemsFromAssistantMessage(message, input)
                 val toolCalls = message.optJSONArray("tool_calls")
                 if (toolCalls != null && toolCalls.length() > 0) {
                     for (j in 0 until toolCalls.length()) {
@@ -535,7 +554,7 @@ object OpenAIResponsesPayloadAdapter {
     private fun convertMessageContentForResponses(content: Any?): Any {
         return when (content) {
             null -> ""
-            is String -> content
+            is String -> ChatMarkupRegex.removeOpenAiResponsesReasoningMeta(content)
             is JSONArray -> {
                 val convertedParts = JSONArray()
 
@@ -543,7 +562,7 @@ object OpenAIResponsesPayloadAdapter {
                     val part = content.optJSONObject(i) ?: continue
                     when (part.optString("type", "")) {
                         "text", "output_text", "input_text" -> {
-                            val text = part.optString("text", "")
+                            val text = ChatMarkupRegex.removeOpenAiResponsesReasoningMeta(part.optString("text", ""))
                             if (text.isNotEmpty()) {
                                 convertedParts.put(
                                     JSONObject().apply {
@@ -626,6 +645,79 @@ object OpenAIResponsesPayloadAdapter {
 
             else -> content.toString()
         }
+    }
+
+    fun createReasoningMetadataTag(item: JSONObject): String? {
+        if (item.optString("type", "") != "reasoning") {
+            return null
+        }
+
+        val id = item.optString("id", "").trim()
+        val encryptedContent = item.optString("encrypted_content", "").trim()
+        if (id.isEmpty() || encryptedContent.isEmpty()) {
+            return null
+        }
+
+        val payload = JSONObject().apply {
+            put("reasoning_id", id)
+            put("encrypted_content", encryptedContent)
+            val summaryArray = item.optJSONArray("summary")
+            if (summaryArray != null && summaryArray.length() > 0) {
+                put("summary", JSONArray(summaryArray.toString()))
+            }
+        }
+        val payloadBase64 = Base64.encodeToString(payload.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        return ChatMarkupRegex.openAiResponsesReasoningMetaTag(payloadBase64)
+    }
+
+    private fun appendReasoningItemsFromAssistantMessage(message: JSONObject, input: JSONArray) {
+        val content = message.opt("content")
+        val payloads = when (content) {
+            is String -> ChatMarkupRegex.extractOpenAiResponsesReasoningPayloads(content)
+            is JSONArray -> extractReasoningPayloadsFromContentArray(content)
+            else -> emptyList()
+        }
+
+        payloads.forEach { payloadBase64 ->
+            runCatching {
+                val decodedPayload = String(Base64.decode(payloadBase64, Base64.DEFAULT), Charsets.UTF_8)
+                appendReasoningItemFromMetadata(JSONObject(decodedPayload), input)
+            }.onFailure { e ->
+                AppLogger.w("OpenAIResponsesProvider", "OpenAI Responses reasoning metadata decode failed", e)
+            }
+        }
+    }
+
+    private fun extractReasoningPayloadsFromContentArray(content: JSONArray): List<String> {
+        val payloads = mutableListOf<String>()
+        for (i in 0 until content.length()) {
+            val part = content.optJSONObject(i) ?: continue
+            val text = part.optString("text", "")
+            if (text.isNotEmpty()) {
+                payloads.addAll(ChatMarkupRegex.extractOpenAiResponsesReasoningPayloads(text))
+            }
+        }
+        return payloads
+    }
+
+    private fun appendReasoningItemFromMetadata(metadata: JSONObject, input: JSONArray) {
+        val reasoningId = metadata.optString("reasoning_id", "").trim()
+        val encryptedContent = metadata.optString("encrypted_content", "").trim()
+        if (reasoningId.isEmpty() || encryptedContent.isEmpty()) {
+            return
+        }
+
+        input.put(
+            JSONObject().apply {
+                put("type", "reasoning")
+                put("id", reasoningId)
+                put("encrypted_content", encryptedContent)
+                val summary = metadata.optJSONArray("summary")
+                if (summary != null) {
+                    put("summary", JSONArray(summary.toString()))
+                }
+            }
+        )
     }
 
     private fun convertFunctionCallItemToChatToolCall(item: JSONObject): JSONObject? {

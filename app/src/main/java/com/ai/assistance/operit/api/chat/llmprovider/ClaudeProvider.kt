@@ -10,6 +10,7 @@ import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.ToolPrompt
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.api.chat.llmprovider.EndpointCompleter
 import com.ai.assistance.operit.util.ChatUtils
 import com.ai.assistance.operit.util.HttpLogSanitizer
@@ -1235,7 +1236,12 @@ class ClaudeProvider(
     }
 
     private fun mapThinkingQualityToEffort(qualityLevel: Int): String =
-        listOf("low", "medium", "high", "max")[qualityLevel.coerceIn(1, 4) - 1]
+        listOf("low", "medium", "high", "max", "max")[
+            qualityLevel.coerceIn(
+                ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+                ApiPreferences.MAX_THINKING_QUALITY_LEVEL
+            ) - 1
+        ]
 
     // 添加模型参数
     private fun addParameters(jsonObject: JSONObject, modelParameters: List<ModelParameter<*>>) {

@@ -550,20 +550,20 @@ open class OpenAIProvider(
     ): RequestBody {
         val jsonString =
             createRequestBodyInternal(context, chatHistory, modelParameters, stream, availableTools, preserveThinkInHistory)
-        if (!OpenAiGpt56Reasoning.supportsChat(providerType, modelName)) {
+        if (!supportsOpenAiChatReasoningEffort()) {
             return createJsonRequestBody(jsonString)
         }
         val requestJson = JSONObject(jsonString)
-        applyGpt56ChatReasoning(context, requestJson, enableThinking)
+        applyOpenAiChatReasoning(context, requestJson, enableThinking)
         return createJsonRequestBody(requestJson.toString())
     }
 
-    private fun applyGpt56ChatReasoning(
+    private fun applyOpenAiChatReasoning(
         context: Context,
         requestJson: JSONObject,
         enableThinking: Boolean
     ) {
-        if (!OpenAiGpt56Reasoning.supportsChat(providerType, modelName)) {
+        if (!supportsOpenAiChatReasoningEffort()) {
             return
         }
 
@@ -577,18 +577,18 @@ open class OpenAIProvider(
         }
 
         val effort = if (enableThinking) {
-            resolveGpt56ChatReasoningEffort(context)
+            resolveOpenAiChatReasoningEffort(context)
         } else {
             "none"
         } ?: return
         requestJson.put("reasoning_effort", effort)
         AppLogger.d(
             "OpenAIProvider",
-            "GPT-5.6 Chat Completions reasoning_effort=$effort"
+            "OpenAI Chat Completions reasoning_effort=$effort"
         )
     }
 
-    private fun resolveGpt56ChatReasoningEffort(context: Context): String? {
+    private fun resolveOpenAiChatReasoningEffort(context: Context): String? {
         val qualityLevel = runCatching {
             runBlocking {
                 ApiPreferences.getInstance(context).thinkingQualityLevelFlow.first()
@@ -602,8 +602,16 @@ open class OpenAIProvider(
             return null
         }
 
-        return OpenAiGpt56Reasoning.effortForQualityLevel(qualityLevel)
+        val effortLevels = listOf("low", "medium", "high", "xhigh", "max")
+        val qualityIndex = qualityLevel.coerceIn(
+            ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+            ApiPreferences.MAX_THINKING_QUALITY_LEVEL
+        ) - 1
+        return effortLevels[qualityIndex]
     }
+
+    private fun supportsOpenAiChatReasoningEffort(): Boolean =
+        providerType == ApiProviderType.OPENAI || providerType == ApiProviderType.OPENAI_GENERIC
 
     protected fun createJsonRequestBody(jsonString: String): RequestBody {
         return jsonString.toByteArray(Charsets.UTF_8).toRequestBody(JSON)
@@ -2066,6 +2074,16 @@ open class OpenAIProvider(
                     if (itemReasoningText.isNotEmpty() && state.streamedReasoningContentLength == 0) {
                         emitCompletedResponsesReasoningText(itemReasoningText, state, emitter)
                     }
+                    if (eventType == "response.output_item.done") {
+                        OpenAIResponsesPayloadAdapter.createReasoningMetadataTag(item)?.let { metadataTag ->
+                            if (state.isInReasoningMode) {
+                                state.isInReasoningMode = false
+                                emitter.emitTag("</think>")
+                                state.hasEmittedThinkStart = false
+                            }
+                            emitter.emitTag(metadataTag)
+                        }
+                    }
                     return
                 }
 
@@ -2592,6 +2610,9 @@ open class OpenAIProvider(
                                         if (reasoningChunk.isNotEmpty()) {
                                             emitter.emitThinkContent(reasoningChunk)
                                         }
+                                    }
+                                    parsed.reasoningMetadataTags.forEach { metadataTag ->
+                                        emitter.emitTag(metadataTag)
                                     }
 
                                     if (!handledImages) {

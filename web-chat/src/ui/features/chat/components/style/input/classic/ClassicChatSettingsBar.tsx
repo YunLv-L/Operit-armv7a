@@ -13,7 +13,7 @@ import {
 } from '../../../../util/chatIcons';
 import {
   clampThinkingQualityLevel,
-  getMaxThinkingQualityLevel
+  MAX_THINKING_QUALITY_LEVEL
 } from '../../../../util/thinkingQuality';
 import type {
   WebInputSettingsState,
@@ -699,14 +699,12 @@ export function ClassicChatSettingsBar({
   const [showDisableSettingsDropdown, setShowDisableSettingsDropdown] = useState(false);
   const [infoPopupContent, setInfoPopupContent] = useState<InfoContent | null>(null);
   const thinkingEnabled = inputSettings?.enable_thinking_mode ?? false;
-  const maxThinkingQualityLevel = getMaxThinkingQualityLevel(
-    modelSelector?.current_provider_type,
-    modelSelector?.current_model_name
-  );
-  const thinkingQualityLevel = clampThinkingQualityLevel(
-    inputSettings?.thinking_quality_level ?? 1,
-    maxThinkingQualityLevel
-  );
+  const thinkingQuality = inputSettings
+    ? {
+        maxLevel: MAX_THINKING_QUALITY_LEVEL,
+        level: clampThinkingQualityLevel(inputSettings.thinking_quality_level)
+      }
+    : null;
   const enableMaxContextMode = inputSettings?.enable_max_context_mode ?? false;
   const enableMemoryAutoUpdate = inputSettings?.enable_memory_auto_update ?? false;
   const enableAutoRead = inputSettings?.enable_auto_read ?? false;
@@ -786,22 +784,24 @@ export function ClassicChatSettingsBar({
                   onSelectProfile={onSelectMemoryProfile}
                 />
 
-                <ClassicThinkingSettingsItem
-                  enabled={thinkingEnabled}
-                  expanded={showThinkingDropdown}
-                  onExpandedChange={setShowThinkingDropdown}
-                  onInfoClick={() => openInfo(INFO_COPY.thinkingSettings)}
-                  onQualityChange={(value) => {
-                    void onUpdateInputSettings({ thinking_quality_level: value });
-                  }}
-                  onQualityInfoClick={() => openInfo(INFO_COPY.thinkingQuality)}
-                  onToggle={() => {
-                    void onUpdateInputSettings({ enable_thinking_mode: !thinkingEnabled });
-                  }}
-                  onToggleInfoClick={() => openInfo(INFO_COPY.thinkingMode)}
-                  maxQualityLevel={maxThinkingQualityLevel}
-                  qualityLevel={thinkingQualityLevel}
-                />
+                {thinkingQuality ? (
+                  <ClassicThinkingSettingsItem
+                    enabled={thinkingEnabled}
+                    expanded={showThinkingDropdown}
+                    onExpandedChange={setShowThinkingDropdown}
+                    onInfoClick={() => openInfo(INFO_COPY.thinkingSettings)}
+                    onQualityChange={(value) => {
+                      void onUpdateInputSettings({ thinking_quality_level: value });
+                    }}
+                    onQualityInfoClick={() => openInfo(INFO_COPY.thinkingQuality)}
+                    onToggle={() => {
+                      void onUpdateInputSettings({ enable_thinking_mode: !thinkingEnabled });
+                    }}
+                    onToggleInfoClick={() => openInfo(INFO_COPY.thinkingMode)}
+                    maxQualityLevel={thinkingQuality.maxLevel}
+                    qualityLevel={thinkingQuality.level}
+                  />
+                ) : null}
 
                 <ClassicDisableSettingsGroup
                   disableStreamOutput={disableStreamOutput}

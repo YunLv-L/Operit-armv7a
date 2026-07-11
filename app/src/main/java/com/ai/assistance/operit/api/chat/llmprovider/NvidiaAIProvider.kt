@@ -5,7 +5,10 @@ import com.ai.assistance.operit.core.chat.hooks.PromptTurn
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.ToolPrompt
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.util.AppLogger
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -73,16 +76,42 @@ class NvidiaAIProvider(
         // GPT-OSS models on NVIDIA use reasoning_effort to control reasoning depth.
         val modelNameLower = modelName.lowercase()
         val isGptOss = modelNameLower.contains("gpt-oss")
-        val appliedGptOssDefaultEffort = enableThinking && isGptOss && !jsonObject.has("reasoning_effort")
-        if (appliedGptOssDefaultEffort) {
-            jsonObject.put("reasoning_effort", "medium")
+        val gptOssEffort = if (enableThinking && isGptOss && !jsonObject.has("reasoning_effort")) {
+            resolveGptOssReasoningEffort(context)
+        } else {
+            null
+        }
+        if (gptOssEffort != null) {
+            jsonObject.put("reasoning_effort", gptOssEffort)
         }
 
         AppLogger.d(
             "NvidiaAIProvider",
-            "NVIDIA thinking params applied: enable_thinking=$enableThinking, gpt_oss_default_effort=$appliedGptOssDefaultEffort"
+            "NVIDIA thinking params applied: enable_thinking=$enableThinking, gpt_oss_reasoning_effort=$gptOssEffort"
         )
 
         return createJsonRequestBody(jsonObject.toString())
+    }
+
+    private fun resolveGptOssReasoningEffort(context: Context): String? {
+        val qualityLevel = runCatching {
+            runBlocking {
+                ApiPreferences.getInstance(context).thinkingQualityLevelFlow.first()
+            }
+        }.getOrElse {
+            AppLogger.w(
+                "NvidiaAIProvider",
+                "Failed to read thinking quality level for NVIDIA GPT-OSS; reasoning_effort not applied",
+                it
+            )
+            return null
+        }
+
+        val efforts = listOf("low", "medium", "high", "max", "max")
+        val qualityIndex = qualityLevel.coerceIn(
+            ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+            ApiPreferences.MAX_THINKING_QUALITY_LEVEL
+        ) - 1
+        return efforts[qualityIndex]
     }
 }

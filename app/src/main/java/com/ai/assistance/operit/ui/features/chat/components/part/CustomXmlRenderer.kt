@@ -88,7 +88,7 @@ class CustomXmlRenderer(
         val trimmedContent = xmlContent.trim()
         val tagName = extractTagName(trimmedContent)
 
-        if (shouldHideGeminiThoughtSignatureMeta(trimmedContent, tagName)) {
+        if (shouldHideHiddenMeta(trimmedContent, tagName)) {
             return
         }
         
@@ -204,9 +204,12 @@ class CustomXmlRenderer(
         return ChatMarkupRegex.extractOpeningTagName(content)
     }
 
-    private fun shouldHideGeminiThoughtSignatureMeta(content: String, tagName: String?): Boolean {
+    private fun shouldHideHiddenMeta(content: String, tagName: String?): Boolean {
         return tagName == "meta" &&
-            Regex("""\bprovider\s*=\s*["']gemini:thought_signature["']""", RegexOption.IGNORE_CASE)
+            Regex(
+                """\bprovider\s*=\s*["'](?:gemini:thought_signature|openai:responses_reasoning)["']""",
+                RegexOption.IGNORE_CASE
+            )
                 .containsMatchIn(content)
     }
 
