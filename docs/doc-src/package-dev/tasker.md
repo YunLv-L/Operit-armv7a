@@ -79,4 +79,4 @@ await Tools.Tasker.triggerEvent({
 
 - `examples/types/tasker.d.ts`
 - `examples/types/index.d.ts`
-- `docs/package_dev/index.md`
+- `docs/doc-src/package-dev/index.md`

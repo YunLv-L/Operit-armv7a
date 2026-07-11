@@ -716,7 +716,7 @@ exports.hello_world = MyNewScript.hello_world;
 ### 步骤 4: 使用类型
 
 -   在文件顶部添加 `/// <reference path="./types/index.d.ts" />` 可以让 TypeScript 编译器和你的IDE（如 VS Code）找到全局的类型定义。
--   `types/` 目录下的 `.d.ts` 文件详细定义了所有可用工具的签名和返回类型。Java Bridge 的契约说明优先以 [docs/JAVA_BRIDGE_INTERFACE.md](./JAVA_BRIDGE_INTERFACE.md) 为准。
+-   `types/` 目录下的 `.d.ts` 文件详细定义了所有可用工具的签名和返回类型。Java Bridge 的契约说明优先以 [dev-core/JAVA_BRIDGE_INTERFACE.md](doc-src/dev-core/JAVA_BRIDGE_INTERFACE.md) 为准。
 
 ## 5. 深入学习：示例脚本解析
 

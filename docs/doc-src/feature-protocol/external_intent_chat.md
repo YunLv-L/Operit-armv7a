@@ -4,7 +4,7 @@
 
 如果你希望通过局域网 HTTP 调用，而不是广播 Intent，请查看：
 
-- `docs/external_http_chat.md`
+- `docs/doc-src/feature-protocol/external_http_chat.md`
 
 HTTP 接口与本文的 Intent 接口语义一致，仅入口不同。
 

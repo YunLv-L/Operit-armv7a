@@ -11,7 +11,7 @@
   <a href="https://aaswordman.github.io/OperitWeb"><img src="https://img.shields.io/badge/📖-User_Guide-blue.svg" alt="User Guide"></a>
   <a href="https://www.patreon.com/c/aaswordsman"><img src="https://img.shields.io/badge/🌍-Patreon-f96854.svg" alt="Patreon"></a>
   <a href="https://afdian.com/a/aaswordsman"><img src="https://img.shields.io/badge/💖-Support_Development-ff6b6b.svg" alt="Support Development"></a>
-  <a href="docs/CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions Welcome"></a>
+  <a href="docs/doc-src/dev-core/CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions Welcome"></a>
   <br>
   <a href="mailto:aaswordsman@foxmail.com"><img src="https://img.shields.io/badge/📧-Email-red.svg" alt="Email"></a>
   <a href="https://qm.qq.com/q/Sa4fKEH7sO"><img src="https://img.shields.io/badge/💬-QQ_Group-blue.svg" alt="QQ Group"></a>
@@ -27,10 +27,10 @@
 
 <div align="center">
   <div style="padding: 10px 0; text-align: center;">
-    <img src="docs/assets/9f85b39450c8616909039b66d15a475a.jpg" width="22%" alt="Operit Preview 1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docs/assets/88a7b7520e4628682a849cc00716c8de.jpg" width="22%" alt="Operit Preview 2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docs/assets/9036f349c25888d357de5ce34580176d.jpg" width="22%" alt="Operit Preview 3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docs/assets/d12038f26df3f814b4e3ce967537f039.jpg" width="22%" alt="Operit Preview 4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/README_examples/UI_terminal.jpg" width="22%" alt="Operit Preview 1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/README_examples/UI_waifuMode.jpg" width="22%" alt="Operit Preview 2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/README_examples/UI_DeepResearch.jpg" width="22%" alt="Operit Preview 3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/README_examples/UI_beautified.jpg" width="22%" alt="Operit Preview 4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
   </div>
 </div>
 
@@ -152,17 +152,17 @@ Customize AI personality and speaking style, with character card backup/export (
 <table>
 <tr>
 <td align="center" width="33%">
-<img src="docs/assets/webdev/c851e530a258bbbbf41f87dcb907b14.png" width="100%"><br>
+<img src="docs/assets/README_examples/function_webdev_MusicGame.png" width="100%"><br>
 <b>Web Development</b><br>
 Design web pages on your phone and export as standalone apps
 </td>
 <td align="center" width="33%">
-<img src="docs/assets/floating_and_attach.jpg" height="200px"><br>
+<img src="docs/assets/README_examples/function_floating_and_attach.jpg" height="200px"><br>
 <b>Floating Window & Attachments</b><br>
 Access anytime, share conveniently
 </td>
 <td align="center" width="33%">
-<img src="docs/assets/84ea63a7437eae374f53c5b64f52c24d.png" height="200px"><br>
+<img src="docs/assets/README_examples/function_packageMarket.png" height="200px"><br>
 <b>Plugin Marketplace</b><br>
 Rich MCP ecosystem
 </td>
@@ -433,7 +433,7 @@ Rich MCP ecosystem
 Join the Operit open-source ecosystem! We welcome all types of contributions: third-party scripts, MCP plugins, and core feature development.
 
 **Developer Notes:**
-- 📚 [Contribution Guide](docs/CONTRIBUTING.md) | [Script Development Guide (Chinese)](docs/SCRIPT_DEV_GUIDE.md)
+- 📚 [Contribution Guide](docs/doc-src/dev-core/CONTRIBUTING.md) | [Script Development Guide (Chinese)](docs/SCRIPT_DEV_GUIDE.md)
 - 📦 Building requires downloading dependency archives from [Google Drive](https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7?usp=sharing) (`models.zip`, `subpack.zip`, `jniLibs.zip`, `libs.zip`)
 - 💬 Join community discussions: [QQ Group](https://qm.qq.com/q/Sa4fKEH7sO) | [Discord](https://discord.gg/YnV9MWurRF)
 

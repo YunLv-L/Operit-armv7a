@@ -338,4 +338,4 @@ await Tools.System.terminal.close(session.sessionId);
 
 - `examples/types/system.d.ts`
 - `examples/types/results.d.ts`
-- `docs/package_dev/results.md`
+- `docs/doc-src/package-dev/results.md`

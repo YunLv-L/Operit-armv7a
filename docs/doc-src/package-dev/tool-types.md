@@ -220,4 +220,4 @@ const page = await toolCall({
 
 - `examples/types/tool-types.d.ts`
 - `examples/types/core.d.ts`
-- `docs/package_dev/results.md`
+- `docs/doc-src/package-dev/results.md`

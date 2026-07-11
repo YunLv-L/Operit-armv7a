@@ -6,7 +6,7 @@
 
 ### 📜 脚本开发
 
-Operit 支持通过 TypeScript/JavaScript 脚本来扩展 AI 的能力。完整指南请参考 [脚本开发指南 (SCRIPT_DEV_GUIDE.md)](./SCRIPT_DEV_GUIDE.md)。
+Operit 支持通过 TypeScript/JavaScript 脚本来扩展 AI 的能力。完整指南请参考 [脚本开发指南 (SCRIPT_DEV_GUIDE.md)](../../SCRIPT_DEV_GUIDE.md)。
 
 ### 🔌 MCP 插件开发
 

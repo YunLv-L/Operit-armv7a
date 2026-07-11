@@ -662,11 +662,11 @@ ToolPkg.registerSummaryGenerateHook({
 - `toolpkg` 不适合这样调试，因为它涉及 `manifest`、`main` 注册、ToolPkg cache、以及多类 hook/runtime 的重新同步
 - 调试 ToolPkg 时，应使用 `tools/debug_toolpkg.bat` / `tools/debug_toolpkg.sh` / `tools/debug_toolpkg.py`
 
-完整的打包、烧录、启用、刷新 hook/runtime 的工作流说明，见 [TOOLPKG_FORMAT_GUIDE.md](../TOOLPKG_FORMAT_GUIDE.md) 中的“10.3 使用调试安装脚本快速烧录到手机”。
+完整的打包、烧录、启用、刷新 hook/runtime 的工作流说明，见 [TOOLPKG_FORMAT_GUIDE.md](../../TOOLPKG_FORMAT_GUIDE.md) 中的“10.3 使用调试安装脚本快速烧录到手机”。
 
 ## 相关文件
 
 - `examples/types/toolpkg.d.ts`
 - `examples/types/compose-dsl.d.ts`
-- `docs/package_dev/core.md`
+- `docs/doc-src/package-dev/core.md`
 - `docs/TOOLPKG_FORMAT_GUIDE.md`

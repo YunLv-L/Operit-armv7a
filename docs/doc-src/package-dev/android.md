@@ -228,4 +228,4 @@ await android.deviceController.takeScreenshot('/sdcard/screen.png');
 
 - `examples/types/android.d.ts`
 - `examples/types/index.d.ts`
-- `docs/package_dev/system.md`
+- `docs/doc-src/package-dev/system.md`

@@ -451,7 +451,7 @@ await toolCall('default', 'http_request', { url: 'https://example.com', method: 
 
 ## 5. Java / Kotlin Bridge
 
-如果你只想看**给脚本开发者承诺的接口**，优先阅读 [docs/JAVA_BRIDGE_INTERFACE.md](../../../../../../../../docs/JAVA_BRIDGE_INTERFACE.md)。
+如果你只想看**给脚本开发者承诺的接口**，优先阅读 [docs/doc-src/dev-core/JAVA_BRIDGE_INTERFACE.md](../../../../../../../../docs/doc-src/dev-core/JAVA_BRIDGE_INTERFACE.md)。
 
 ### 5.1 入口对象
 

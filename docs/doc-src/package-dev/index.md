@@ -189,7 +189,7 @@ sendIntermediateResult({ state, chatId });
 
 ## 本目录文档索引
 
-当前 `docs/package_dev` 已同步以下文件：
+当前 `docs/doc-src/package-dev` 已同步以下文件：
 
 - `android.md`
 - `chat.md`
@@ -224,6 +224,6 @@ sendIntermediateResult({ state, chatId });
 ## 相关文件
 
 - `examples/types/index.d.ts`
-- `docs/package_dev/core.md`
-- `docs/package_dev/results.md`
-- `docs/package_dev/toolpkg.md`
+- `docs/doc-src/package-dev/core.md`
+- `docs/doc-src/package-dev/results.md`
+- `docs/doc-src/package-dev/toolpkg.md`

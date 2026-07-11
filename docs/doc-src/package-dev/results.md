@@ -315,11 +315,11 @@ console.log(detail.connections.length);
 ## 相关文件
 
 - `examples/types/results.d.ts`
-- `docs/package_dev/files.md`
-- `docs/package_dev/network.md`
-- `docs/package_dev/system.md`
-- `docs/package_dev/ui.md`
-- `docs/package_dev/workflow.md`
-- `docs/package_dev/software_settings.md`
-- `docs/package_dev/chat.md`
-- `docs/package_dev/memory.md`
+- `docs/doc-src/package-dev/files.md`
+- `docs/doc-src/package-dev/network.md`
+- `docs/doc-src/package-dev/system.md`
+- `docs/doc-src/package-dev/ui.md`
+- `docs/doc-src/package-dev/workflow.md`
+- `docs/doc-src/package-dev/software_settings.md`
+- `docs/doc-src/package-dev/chat.md`
+- `docs/doc-src/package-dev/memory.md`

@@ -107,7 +107,7 @@ complete<T>(result: T): void
 补充说明：
 
 - 导出函数既可以直接 `return result`，也可以显式调用 `complete(result)`。
-- Java Bridge 契约以 [docs/JAVA_BRIDGE_INTERFACE.md](../JAVA_BRIDGE_INTERFACE.md) 为准。
+- Java Bridge 契约以 [docs/doc-src/dev-core/JAVA_BRIDGE_INTERFACE.md](../dev-core/JAVA_BRIDGE_INTERFACE.md) 为准。
 - `complete(result)` 适合你需要手动结束或配合 emitter 使用的场景。
 
 ## `NativeInterface`
@@ -161,7 +161,7 @@ complete<T>(result: T): void
 
 补充说明：
 
-- 对脚本开发者承诺的高层 Java Bridge 接口，统一以 [docs/JAVA_BRIDGE_INTERFACE.md](../JAVA_BRIDGE_INTERFACE.md) 为准。
+- 对脚本开发者承诺的高层 Java Bridge 接口，统一以 [docs/doc-src/dev-core/JAVA_BRIDGE_INTERFACE.md](../dev-core/JAVA_BRIDGE_INTERFACE.md) 为准。
 - Java 实例句柄的解绑属于运行时内部生命周期管理，不再提供公开的 `release` / `releaseAll` 脚本接口。
 - `Java.implement(...)` / `Java.proxy(...)` 产生的 JS 回调对象改为运行时自动解绑，旧的脚本侧手动释放接口已移除。
 - `obj.methodName()` 是首选用法，运行时会优先把实例成员按方法来解释，尽量保证语法糖可用。
@@ -232,10 +232,10 @@ complete({ imageLink });
 - `Java`
 - `Kotlin`
 
-这些补充内容请结合 `docs/package_dev/index.md` 一起看。
+这些补充内容请结合 `docs/doc-src/package-dev/index.md` 一起看。
 
 ## 相关文件
 
 - `examples/types/core.d.ts`
 - `examples/types/tool-types.d.ts`
-- `docs/package_dev/index.md`
+- `docs/doc-src/package-dev/index.md`

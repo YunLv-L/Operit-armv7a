@@ -6,7 +6,7 @@
 
 **Operit AI** 是移动端首个功能完备的 AI 智能助手应用，它**完全独立运行**于您的 Android 设备上，拥有强大的**工具调用能力**。本项目旨在为开发者提供一个可深度定制和扩展的 AI 助手框架。
 
-在开始编译之前，请确保您已了解本项目的功能和目标。更多信息请参考项目主页的 [README.md](../README.md)。
+在开始编译之前，请确保您已了解本项目的功能和目标。更多信息请参考项目主页的 [README.md](../../../README.md)。
 
 ## **目录**
 
@@ -269,4 +269,3 @@ app/build/outputs/apk/clone/app-clone.apk
 | Missing web-chat/dist. Run `npm --prefix web-chat run build` first. | 尚未构建 `web-chat` 或构建失败。请先执行 `npm --prefix web-chat install`，再在项目根目录执行 `npm run build:webchat`。 |
 | ERROR: prebuild step failed | `sync_example_packages.py` 在预构建 `examples/` 时失败。请先确认已在项目根目录执行 `npm install`，并检查 `pnpm -v`、`python3 --version` 是否可用。 |
 | You have not accepted the license agreements... | 你跳过了或未成功执行接受许可的步骤。请返回 **第四步** 执行 `yes |
-
