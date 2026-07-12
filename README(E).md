@@ -177,9 +177,9 @@ Rich MCP ecosystem
 |------|-------------|
 | 📋 **System Requirements** | Android 8.0+ (API 26+), 6GB+ RAM recommended, 5GB+ free storage |
 | 📥 **Download & Install** | Download the latest APK from the [Release Page](https://github.com/AAswordman/Operit/releases) |
-| 📖 **User Guide** | [Complete Documentation](https://aaswordman.github.io/OperitWeb) with detailed tutorials and examples |
+| 📖 **User Guide** | [Official Website](https://operit.app) with detailed tutorials and examples |
 
-> **Security Warning:** To ensure your data security, please download this application exclusively from the official [Release Page](https://github.com/AAswordman/Operit/releases) or the [Official Website](https://aaswordman.github.io/OperitWeb/). Installation packages from unofficial sources may be maliciously modified, potentially leading to privacy leaks or device monitoring.
+> **Security Warning:** To ensure your data security, please download this application exclusively from the official [Release Page](https://github.com/AAswordman/Operit/releases) or the [Official Website](https://operit.app). Installation packages from unofficial sources may be maliciously modified, potentially leading to privacy leaks or device monitoring.
 
 **Installation Steps:** Download APK → Install & Launch → Follow Setup Guide → Start Using ✨
 
