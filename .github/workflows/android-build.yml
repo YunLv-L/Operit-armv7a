@@ -1,0 +1,307 @@
+name: Android Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      google_drive_folder:
+        description: Public Google Drive folder URL containing models.zip, subpack.zip, jniLibs.zip and libs.zip
+        required: false
+        default: https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7
+      gradle_task:
+        description: Gradle task to run
+        required: true
+        default: assembleDebug
+      run_unit_tests:
+        description: Run JVM unit tests after the build
+        required: false
+        default: false
+        type: boolean
+      run_android_lint:
+        description: Run Android lint after the build
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      google_drive_folder:
+        description: Public Google Drive folder URL containing models.zip, subpack.zip, jniLibs.zip and libs.zip
+        required: false
+        type: string
+        default: https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7
+      gradle_task:
+        description: Gradle task to run
+        required: false
+        type: string
+        default: assembleDebug
+      run_unit_tests:
+        description: Run JVM unit tests after the build
+        required: false
+        type: boolean
+        default: false
+      run_android_lint:
+        description: Run Android lint after the build
+        required: false
+        type: boolean
+        default: false
+      checkout_ref:
+        description: Commit to build
+        required: false
+        type: string
+        default: ""
+    secrets:
+      OPERIT_GITHUB_CLIENT_ID:
+        required: false
+      OPERIT_GITHUB_CLIENT_SECRET:
+        required: false
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/android-build.yml
+      - app/**
+      - dragonbones/**
+      - fbx/**
+      - llama/**
+      - mmd/**
+      - mnn/**
+      - quickjs/**
+      - showerclient/**
+      - terminal/**
+      - tools/native_ripgrep/**
+      - web-chat/**
+      - examples/**
+      - gradle/**
+      - build.gradle.kts
+      - settings.gradle.kts
+      - gradle.properties
+      - gradlew
+      - package.json
+      - pnpm-workspace.yaml
+      - packages_whitelist.txt
+      - sync_example_packages.py
+concurrency:
+  group: android-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: '21'
+  NODE_VERSION: '22'
+  MANUAL_DEPS_DIR: manual-deps
+  DEFAULT_GOOGLE_DRIVE_FOLDER: https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7
+
+jobs:
+  build:
+    name: Build Android artifacts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout clean source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+          fetch-depth: 1
+          submodules: false
+
+      - name: Initialize required public submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          required_submodules=(
+            terminal
+            mnn/src/main/cpp/MNN
+            llama/third_party/llama.cpp
+            mmd/third_party/saba
+            mmd/third_party/bullet3
+            fbx/third_party/ufbx
+            quickjs/thirdparty/quickjs
+            app/src/main/cpp/thirdparty/ncnn
+            app/src/main/cpp/thirdparty/sherpa-ncnn
+          )
+          git submodule update --init --recursive --depth 1 "${required_submodules[@]}"
+          git submodule status "${required_submodules[@]}"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-34" \
+            "platforms;android-36" \
+            "build-tools;34.0.0" \
+            "build-tools;35.0.0" \
+            "ndk;25.1.8937393" \
+            "cmake;3.22.1"
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Configure local.properties
+        shell: bash
+        env:
+          GITHUB_CLIENT_ID: ${{ secrets.OPERIT_GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.OPERIT_GITHUB_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          {
+            echo "GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}"
+            echo "GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}"
+          } > local.properties
+
+      - name: Cache manual binary dependencies
+        id: cache-manual-deps
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.MANUAL_DEPS_DIR }}
+          key: manual-deps-v3-${{ runner.os }}
+
+      - name: Download manual binary dependencies
+        if: steps.cache-manual-deps.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          FOLDER_URL: ${{ inputs.google_drive_folder || env.DEFAULT_GOOGLE_DRIVE_FOLDER }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user --break-system-packages gdown
+          rm -rf "$MANUAL_DEPS_DIR"
+          mkdir -p "$MANUAL_DEPS_DIR"
+          python3 -m gdown --folder "$FOLDER_URL" --output "$MANUAL_DEPS_DIR"
+
+      - name: Install manual binary dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          restore_zip() {
+            local name="$1"
+            if [ -f "$MANUAL_DEPS_DIR/$name" ]; then
+              return
+            fi
+
+            local found
+            found="$(find "$MANUAL_DEPS_DIR" -type f -name "$name" -print -quit)"
+            if [ -n "$found" ]; then
+              cp "$found" "$MANUAL_DEPS_DIR/$name"
+              return
+            fi
+
+            mapfile -t parts < <(find "$MANUAL_DEPS_DIR" -type f -name "$name.*" | sort)
+            if [ "${#parts[@]}" -gt 0 ]; then
+              cat "${parts[@]}" > "$MANUAL_DEPS_DIR/$name"
+              return
+            fi
+
+            echo "Missing $name in $MANUAL_DEPS_DIR" >&2
+            find "$MANUAL_DEPS_DIR" -maxdepth 3 -type f -print >&2 || true
+            exit 1
+          }
+
+          restore_zip models.zip
+          restore_zip subpack.zip
+          restore_zip jniLibs.zip
+          restore_zip libs.zip
+
+          unzip -qo "$MANUAL_DEPS_DIR/models.zip" -d .
+          unzip -qo "$MANUAL_DEPS_DIR/subpack.zip" -d .
+          unzip -qo "$MANUAL_DEPS_DIR/jniLibs.zip" -d .
+          unzip -qo "$MANUAL_DEPS_DIR/libs.zip" -d .
+
+          test -d app/src/main/assets/models
+          test -d app/src/main/assets/subpack
+          test -d app/src/main/jniLibs
+          find app/libs -type f \( -name '*.aar' -o -name '*.jar' \) | grep -q .
+
+      - name: Cache native ripgrep build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/native_ripgrep/target
+          key: native-ripgrep-arm64-${{ runner.os }}-${{ hashFiles('tools/native_ripgrep/Cargo.lock') }}
+
+      - name: Build native ripgrep
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/25.1.8937393"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add aarch64-linux-android
+          cargo build \
+            --manifest-path tools/native_ripgrep/Cargo.toml \
+            --release \
+            --target aarch64-linux-android \
+            --locked
+          install -Dm755 \
+            tools/native_ripgrep/target/aarch64-linux-android/release/liboperit_ripgrep.so \
+            app/src/main/jniLibs/arm64-v8a/liboperit_ripgrep.so
+          file app/src/main/jniLibs/arm64-v8a/liboperit_ripgrep.so
+          test -s app/src/main/jniLibs/arm64-v8a/liboperit_ripgrep.so
+
+      - name: Install JavaScript toolchain dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g pnpm@10
+          npm install --no-audit --no-fund
+          npm --prefix web-chat install --no-audit --no-fund
+          node --version
+          npm --version
+          pnpm --version
+
+      - name: Build web-chat assets
+        run: npm run build:webchat
+
+      - name: Build bundled tool packages
+        run: python3 ./sync_example_packages.py
+
+      - name: Run Gradle build
+        shell: bash
+        env:
+          GRADLE_TASK: ${{ inputs.gradle_task || 'assembleDebug' }}
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew "$GRADLE_TASK" --stacktrace --build-cache --no-daemon
+
+      - name: Run JVM unit tests
+        if: inputs.run_unit_tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace --build-cache --no-daemon
+
+      - name: Run Android lint
+        if: inputs.run_android_lint
+        run: ./gradlew :app:lintDebug --stacktrace --build-cache --no-daemon
+
+      - name: Upload Android build outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operit-android-${{ github.run_number }}
+          path: |
+            app/build/outputs/apk/**/*.apk
+            app/build/outputs/bundle/**/*.aab
+            app/build/reports/**
+            build/reports/**
+          if-no-files-found: warn
+          retention-days: 14
