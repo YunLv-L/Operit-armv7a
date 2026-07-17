@@ -50,7 +50,12 @@ List commands, tests, device/OS, build variants, and results; explain why a chec
 
 ## 检查清单 / Checklist
 
-- [ ] 我已确认没有引入 API Key、Token 或其他敏感信息 / No secrets or private data are included
-- [ ] 我已运行与本次改动相关的本地检查 / Relevant local checks have been run
-- [ ] 我已更新必要的文档、字符串或测试 / Required docs, strings, or tests are updated
-- [ ] 我已确认本 PR 不包含无关改动 / This PR does not include unrelated changes
+<!--
+以下四项均为必填。若某项不适用，请在“验证方式”中写明 N/A 和原因。
+All four items are required. If an item is not applicable, write N/A and explain why in Verification.
+-->
+
+- [ ] 我已记录可复现验证和未运行项原因 / Reproducible verification and reasons for unrun checks are recorded
+- [ ] 与改动范围匹配的必需 CI 已通过或按路径规则跳过 / Required CI passed or was skipped by path rules
+- [ ] 最终 diff 无无关、临时、生成、二进制或敏感内容 / Final diff has no unrelated, temporary, generated, binary, or secret content
+- [ ] 已提供对应的回归、UI、文档/字符串或兼容性证据 / Relevant regression, UI, docs/strings, or compatibility evidence is provided
