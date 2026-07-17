@@ -241,8 +241,28 @@ jobs:
               if section not in body:
                   errors.append(f"PR body is missing section: {section}")
 
-          if not re.search(r"(?m)^- \[[xX]\]", body):
-              errors.append("At least one checklist item must be checked.")
+          checked_items = re.findall(r"(?m)^- \[[xX]\]\s+(.+)$", body)
+          required_checklist_items = (
+              (
+                  "我已记录可复现验证和未运行项原因",
+                  "Reproducible verification and reasons for unrun checks are recorded",
+              ),
+              (
+                  "与改动范围匹配的必需 CI 已通过或按路径规则跳过",
+                  "Required CI passed or was skipped by path rules",
+              ),
+              (
+                  "最终 diff 无无关、临时、生成、二进制或敏感内容",
+                  "Final diff has no unrelated, temporary, generated, binary, or secret content",
+              ),
+              (
+                  "已提供对应的回归、UI、文档/字符串或兼容性证据",
+                  "Relevant regression, UI, docs/strings, or compatibility evidence is provided",
+              ),
+          )
+          for chinese_label, english_label in required_checklist_items:
+              if not any(item.startswith((chinese_label, english_label)) for item in checked_items):
+                  errors.append(f"Required checklist item is unchecked: {chinese_label} / {english_label}.")
 
           kind = title.split(":", 1)[0].split("(", 1)[0]
           if kind in {"feat", "fix", "perf"} and not re.search(
