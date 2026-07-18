@@ -652,6 +652,8 @@ ToolPkg.registerSummaryGenerateHook({
 
 这是一种**从仓库示例总结出的约定**；它不是 `toolpkg.d.ts` 本身直接声明的函数签名。
 
+包管理器会在独立的临时 QuickJS 引擎中执行每个工具包的 `registerToolPkg()`，单包最长执行 12 秒。该入口只应用于声明注册项，不应启动常驻定时器、无限循环或等待长期任务。注册结束后临时引擎会被销毁，工具调用与 UI hook 在各自的运行时 context 中执行，因此不要依赖注册阶段留下的 JavaScript 全局状态。
+
 ## 开发调试安装
 
 `toolpkg.d.ts` 这里描述的是注册 API，本身不负责“如何调试安装到手机”。

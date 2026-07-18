@@ -5,6 +5,7 @@ import android.provider.DocumentsContract
 import com.ai.assistance.operit.core.tools.LocalizedText
 import com.ai.assistance.operit.core.tools.StringOrStringListSerializer
 import com.ai.assistance.operit.core.tools.ToolPackage
+import com.ai.assistance.operit.util.ToolPkgProtection
 import java.io.File
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
@@ -1310,9 +1311,7 @@ internal object ToolPkgArchiveParser {
         val archiveEntryName = entryIndex.resolveEntryName(rawPath) ?: return null
         val entry = archive.getEntry(archiveEntryName) ?: return null
         archive.getInputStream(entry).use { input ->
-            return input.bufferedReader(StandardCharsets.UTF_8).use { reader ->
-                reader.readText()
-            }
+            return ToolPkgProtection.decodeUtf8(input.readBytes())
         }
     }
 
@@ -1326,7 +1325,7 @@ internal object ToolPkgArchiveParser {
         if (!file.isFile) {
             return null
         }
-        return file.readText(StandardCharsets.UTF_8)
+        return ToolPkgProtection.decodeUtf8(file.readBytes())
     }
 
     fun readToolPkgManifestPreview(inputStreamFactory: () -> InputStream): ToolPkgManifestPreview? {

@@ -2,6 +2,36 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project(streamnative)
 
+set(TOOLPKG_PROTECTION_SECRET_VALUE "$ENV{OPERIT_TOOLPKG_PROTECTION_SECRET}")
+
+if("${TOOLPKG_PROTECTION_SECRET_VALUE}" STREQUAL "")
+        set(TOOLPKG_PROTECTION_ENV_FILES
+                "${CMAKE_CURRENT_LIST_DIR}/../../../../.env.local"
+                "${CMAKE_CURRENT_LIST_DIR}/../../../../.env"
+                "${CMAKE_CURRENT_LIST_DIR}/../../../.env.local"
+                "${CMAKE_CURRENT_LIST_DIR}/../../../.env"
+        )
+        foreach(TOOLPKG_PROTECTION_ENV_FILE IN LISTS TOOLPKG_PROTECTION_ENV_FILES)
+                if("${TOOLPKG_PROTECTION_SECRET_VALUE}" STREQUAL "" AND EXISTS "${TOOLPKG_PROTECTION_ENV_FILE}")
+                        file(STRINGS "${TOOLPKG_PROTECTION_ENV_FILE}" TOOLPKG_PROTECTION_ENV_LINES
+                                REGEX "^[ \t]*(export[ \t]+)?OPERIT_TOOLPKG_PROTECTION_SECRET[ \t]*="
+                        )
+                        list(LENGTH TOOLPKG_PROTECTION_ENV_LINES TOOLPKG_PROTECTION_ENV_LINE_COUNT)
+                        if(TOOLPKG_PROTECTION_ENV_LINE_COUNT GREATER 0)
+                                list(GET TOOLPKG_PROTECTION_ENV_LINES 0 TOOLPKG_PROTECTION_ENV_LINE)
+                                string(REGEX REPLACE "^[ \t]*(export[ \t]+)?OPERIT_TOOLPKG_PROTECTION_SECRET[ \t]*=[ \t]*" "" TOOLPKG_PROTECTION_SECRET_VALUE "${TOOLPKG_PROTECTION_ENV_LINE}")
+                                string(REGEX REPLACE "[ \t]*#.*$" "" TOOLPKG_PROTECTION_SECRET_VALUE "${TOOLPKG_PROTECTION_SECRET_VALUE}")
+                                string(STRIP "${TOOLPKG_PROTECTION_SECRET_VALUE}" TOOLPKG_PROTECTION_SECRET_VALUE)
+                                string(REGEX REPLACE "^\"(.*)\"$" "\\1" TOOLPKG_PROTECTION_SECRET_VALUE "${TOOLPKG_PROTECTION_SECRET_VALUE}")
+                                string(REGEX REPLACE "^'(.*)'$" "\\1" TOOLPKG_PROTECTION_SECRET_VALUE "${TOOLPKG_PROTECTION_SECRET_VALUE}")
+                        endif()
+                endif()
+        endforeach()
+endif()
+
+string(REPLACE "\\" "\\\\" TOOLPKG_PROTECTION_SECRET_VALUE "${TOOLPKG_PROTECTION_SECRET_VALUE}")
+string(REPLACE "\"" "\\\"" TOOLPKG_PROTECTION_SECRET_VALUE "${TOOLPKG_PROTECTION_SECRET_VALUE}")
+
 function(force_release_flags_for_debug target_name)
     if(TARGET ${target_name})
         # Keep app variant as Debug, but compile heavy native libs with release-like optimization.
@@ -56,6 +86,7 @@ add_library(
         SHARED
         streamnative/native_xml_splitter.cpp
         streamnative/native_markdown_splitter.cpp
+        streamnative/native_toolpkg_protection.cpp
         streamnative/StreamOperators.cpp
         streamnative/plugins/StreamXmlPlugin.cpp
         streamnative/plugins/BaseJsonPlugin.cpp
@@ -71,6 +102,12 @@ target_include_directories(
         streamnative
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_compile_definitions(
+        streamnative
+        PRIVATE
+        TOOLPKG_PROTECTION_SECRET="${TOOLPKG_PROTECTION_SECRET_VALUE}"
 )
 
 find_library(

@@ -956,7 +956,11 @@ internal class PackageManagerToolPkgFacade(
 
             val getExecutionEngineStartTime = if (shouldLogTiming) messageTimingNow() else 0L
             val resolvedExecutionContextKey = resolveToolPkgExecutionContextKey(runtime.packageName, params)
-            val executionEngine = packageManager.getToolPkgExecutionEngine(resolvedExecutionContextKey)
+            val executionEngine =
+                packageManager.getToolPkgExecutionEngine(
+                    contextKey = resolvedExecutionContextKey,
+                    containerPackageName = runtime.packageName
+                )
             if (shouldLogTiming) {
                 logMessageTiming(
                     stage = "toolpkg.runMainHook.getExecutionEngine",

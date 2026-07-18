@@ -32,6 +32,7 @@ import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceConfig
 import com.ai.assistance.operit.widget.ToolPkgDesktopWidgetHost
 import com.ai.assistance.operit.util.OperitPaths
+import com.ai.assistance.operit.util.ToolPkgProtection
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
@@ -278,8 +279,6 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
 
     private val skillVisibilityPreferences by lazy { SkillVisibilityPreferences.getInstance(context) }
 
-    // JavaScript engine for executing JS package code
-    private val jsEngine by lazy { JsEngine(context) }
     private val toolPkgFacade by lazy { PackageManagerToolPkgFacade(this) }
 
     // Environment preferences for package-level env variables
@@ -390,24 +389,32 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
     internal val contextInternal: Context
         get() = context
 
-    internal val jsEngineInternal: JsEngine
-        get() = jsEngine
-
-    internal fun getToolPkgExecutionEngine(contextKey: String): JsEngine {
-        return toolPkgManager.getToolPkgExecutionEngine(contextKey)
+    internal fun getToolPkgExecutionEngine(
+        contextKey: String,
+        containerPackageName: String
+    ): JsEngine {
+        return toolPkgManager.getToolPkgExecutionEngine(contextKey, containerPackageName)
     }
 
     internal fun findToolPkgExecutionEngine(contextKey: String): JsEngine? {
         return toolPkgManager.findToolPkgExecutionEngine(contextKey)
     }
 
+    fun releaseToolPkgExecutionEngine(
+        contextKey: String,
+        executionEngine: JsEngine
+    ) {
+        toolPkgManager.releaseToolPkgExecutionEngine(contextKey, executionEngine)
+    }
+
     fun releaseToolPkgExecutionEngine(contextKey: String) {
+        // Preserve the existing application-facing signature.
         toolPkgManager.releaseToolPkgExecutionEngine(contextKey)
     }
 
-    private fun destroyDefaultToolPkgExecutionEngine(packageName: String) {
+    private fun destroyToolPkgExecutionEngines(packageName: String) {
         val normalizedPackageName = normalizePackageName(packageName)
-        toolPkgManager.destroyDefaultToolPkgExecutionEngine(normalizedPackageName)
+        toolPkgManager.destroyToolPkgExecutionEngines(normalizedPackageName)
     }
 
     internal val toolPkgContainersInternal: MutableMap<String, ToolPkgContainerRuntime>
@@ -1674,7 +1681,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         }
     ): ToolPackage? {
         try {
-            val jsContent = file.readText()
+            val jsContent = ToolPkgProtection.decodeUtf8(file.readBytes())
             return parseJsPackage(jsContent) { key, error ->
                 reportPackageLoadError(
                     key,
@@ -1706,7 +1713,9 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
     ): ToolPackage? {
         try {
             val assetManager = context.assets
-            val jsContent = assetManager.open(assetPath).bufferedReader().use { it.readText() }
+            val jsContent = assetManager.open(assetPath).use { input ->
+                ToolPkgProtection.decodeUtf8(input.readBytes())
+            }
             return parseJsPackage(jsContent) { key, error ->
                 reportPackageLoadError(
                     key,
@@ -1729,6 +1738,17 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         }
     }
 
+    private inline fun <T> withToolPkgRegistrationEngine(block: (JsEngine) -> T): T {
+        // Registration executes untrusted package code. Per-package ownership keeps a timed-out
+        // runtime from retaining state or blocking registration of the next package.
+        val registrationEngine = JsEngine(context)
+        return try {
+            block(registrationEngine)
+        } finally {
+            registrationEngine.destroy()
+        }
+    }
+
     private fun loadToolPkgFromExternalFile(
         file: File,
         reportPackageLoadError: (key: String, error: String) -> Unit = { key, error ->
@@ -1737,20 +1757,22 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
     ): ToolPkgLoadResult? {
         val startMs = System.currentTimeMillis()
         return try {
-            ToolPkgLoader.loadToolPkgFromExternalFile(
-                file = file,
-                jsEngine = jsEngine,
-                parseJsPackage = { jsContent, onError -> parseJsPackage(jsContent, onError) },
-                reportPackageLoadError = { key, error ->
-                    reportPackageLoadError(
-                        key,
-                        formatPackageLoadError(
-                            message = error,
-                            sourcePath = file.absolutePath
+            withToolPkgRegistrationEngine { registrationEngine ->
+                ToolPkgLoader.loadToolPkgFromExternalFile(
+                    file = file,
+                    jsEngine = registrationEngine,
+                    parseJsPackage = { jsContent, onError -> parseJsPackage(jsContent, onError) },
+                    reportPackageLoadError = { key, error ->
+                        reportPackageLoadError(
+                            key,
+                            formatPackageLoadError(
+                                message = error,
+                                sourcePath = file.absolutePath
+                            )
                         )
-                    )
-                }
-            )
+                    }
+                )
+            }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error loading toolpkg from external file: ${file.absolutePath}", e)
             logToolPkgError(
@@ -1812,27 +1834,29 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
     ): ToolPkgLoadResult? {
         val startMs = System.currentTimeMillis()
         return try {
-            ToolPkgLoader.loadToolPkgFromAsset(
-                context = context,
-                assetPath = assetPath,
-                jsEngine = jsEngine,
-                parseJsPackage = { jsContent, onError -> parseJsPackage(jsContent, onError) },
-                prepareAssetCache = { manifestPreview ->
-                    prepareToolPkgAssetCache(
-                        assetPath = assetPath,
-                        manifestPreview = manifestPreview
-                    )
-                },
-                reportPackageLoadError = { key, error ->
-                    reportPackageLoadError(
-                        key,
-                        formatPackageLoadError(
-                            message = error,
-                            sourcePath = assetPath
+            withToolPkgRegistrationEngine { registrationEngine ->
+                ToolPkgLoader.loadToolPkgFromAsset(
+                    context = context,
+                    assetPath = assetPath,
+                    jsEngine = registrationEngine,
+                    parseJsPackage = { jsContent, onError -> parseJsPackage(jsContent, onError) },
+                    prepareAssetCache = { manifestPreview ->
+                        prepareToolPkgAssetCache(
+                            assetPath = assetPath,
+                            manifestPreview = manifestPreview
                         )
-                    )
-                }
-            )
+                    },
+                    reportPackageLoadError = { key, error ->
+                        reportPackageLoadError(
+                            key,
+                            formatPackageLoadError(
+                                message = error,
+                                sourcePath = assetPath
+                            )
+                        )
+                    }
+                )
+            }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error loading toolpkg from asset: $assetPath", e)
             logToolPkgError(
@@ -1858,7 +1882,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         if (resourceFile == null || !resourceFile.isFile) {
             return null
         }
-        return resourceFile.readBytes()
+        return ToolPkgProtection.decryptIfNeeded(resourceFile.readBytes())
     }
 
     internal fun exportToolPkgResource(
@@ -2462,7 +2486,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
 
         val enableMessage = enablePackage(normalizedContainerPackageName)
 
-        destroyDefaultToolPkgExecutionEngine(normalizedContainerPackageName)
+        destroyToolPkgExecutionEngines(normalizedContainerPackageName)
 
         (
             previousSubpackageNames +
@@ -2535,7 +2559,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
 
         getAvailablePackages(forceRefresh = true)
 
-        enabledToolPkgContainersBeforeRefresh.forEach(::destroyDefaultToolPkgExecutionEngine)
+        enabledToolPkgContainersBeforeRefresh.forEach(::destroyToolPkgExecutionEngines)
         previouslyActivePackages.forEach(::unregisterPackageTools)
 
         val reactivatedPackages = mutableListOf<String>()
@@ -3243,7 +3267,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
             saveToolPkgSubpackageStates(subpackageStates)
             addToDisabledIfDefaultEnabled(normalizedPackageName)
             deleteToolPkgCacheDir(normalizedPackageName)
-            destroyDefaultToolPkgExecutionEngine(normalizedPackageName)
+            destroyToolPkgExecutionEngines(normalizedPackageName)
 
             return if (packageWasRemoved) {
                 "Successfully disabled toolpkg container: $normalizedPackageName"
@@ -3421,7 +3445,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
             val container = toolPkgContainers.remove(packageName)
             availablePackages.remove(packageName)
             deleteToolPkgCacheDir(packageName)
-            destroyDefaultToolPkgExecutionEngine(packageName)
+            destroyToolPkgExecutionEngines(packageName)
 
             val states = getToolPkgSubpackageStatesInternal().toMutableMap()
             container?.subpackages?.forEach { subpackage ->
@@ -3525,7 +3549,6 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
     /** Clean up resources when the manager is no longer needed */
     fun destroy() {
         toolPkgManager.destroy()
-        jsEngine.destroy()
         mcpManager.shutdown()
     }
 }
