@@ -63,7 +63,7 @@ jobs:
 
           while IFS= read -r -d '' path; do
             case "$path" in
-              app/*|dragonbones/*|fbx/*|llama/*|mmd/*|mnn/*|quickjs/*|showerclient/*|terminal/*|tools/native_ripgrep/*|gradle/*|build.gradle.kts|settings.gradle.kts|gradle.properties|gradlew|package.json|pnpm-workspace.yaml|packages_whitelist.txt|sync_example_packages.py|.github/workflows/android-build.yml)
+              app/*|dragonbones/*|examples/*|fbx/*|llama/*|mmd/*|mnn/*|quickjs/*|showerclient/*|terminal|terminal/*|tools/native_ripgrep/*|gradle/*|.gitmodules|build.gradle.kts|settings.gradle.kts|gradle.properties|gradlew|package.json|pnpm-workspace.yaml|packages_whitelist.txt|sync_example_packages.py|.github/workflows/android-build.yml)
                 android=true
                 ;;
             esac
@@ -123,6 +123,9 @@ jobs:
 
       - name: Check changed files
         run: python3 ci/script/check_repo_hygiene.py --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA"
+
+      - name: Check Android lint baseline paths
+        run: python3 ci/script/normalize_lint_baseline.py --check
 
       - name: Check local Markdown links
         run: python3 ci/script/check_markdown_links.py --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA"
