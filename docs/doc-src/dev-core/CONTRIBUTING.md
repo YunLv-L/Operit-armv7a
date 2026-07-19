@@ -73,7 +73,7 @@ npm --prefix web-chat install
 npm --prefix web-chat run build
 
 # 示例包或 ToolPkg
-python3 ./sync_example_packages.py
+python3 ./tools/sync_example_packages.py
 
 # Android JVM 单测、lint 和构建
 ./gradlew :app:testDebugUnitTest

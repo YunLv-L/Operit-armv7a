@@ -1551,14 +1551,30 @@ class JsEngine(private val context: Context) {
                 resourcePath = resourcePath
             )?.let { resolved -> return resolved }
             if (temporaryResolverActive) {
-                // During toolpkg parsing we must not fall back into PackageManager.
-                // That fallback can wait on initialization and deadlock JavaBridge thread.
+                // During toolpkg parsing, PackageManager access can wait on initialization
+                // and deadlock JavaBridge thread.
                 return ""
             }
             return JsNativeInterfaceDelegates.readToolPkgTextResource(
                     packageManager = packageManager,
                     packageNameOrSubpackageId = packageNameOrSubpackageId,
                     resourcePath = resourcePath
+            )
+        }
+
+        @JavascriptInterface
+        fun callToolPkgWasm(
+            packageNameOrSubpackageId: String,
+            moduleId: String,
+            exportName: String,
+            argsJson: String
+        ): String {
+            return JsNativeInterfaceDelegates.callToolPkgWasm(
+                packageManager = packageManager,
+                packageNameOrSubpackageId = packageNameOrSubpackageId,
+                moduleId = moduleId,
+                exportName = exportName,
+                argsJson = argsJson
             )
         }
 

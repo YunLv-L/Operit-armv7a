@@ -1073,6 +1073,7 @@
     <string name="pkg_toolpkg_subpackages">ToolPkg Subpackages</string>
     <string name="pkg_toolpkg_version">Version: %1$s</string>
     <string name="pkg_toolpkg_resources">Resources: %1$d</string>
+    <string name="pkg_toolpkg_wasm_modules">WASM modules: %1$d</string>
     <string name="pkg_toolpkg_ui_modules">UI modules: %1$d</string>
     <string name="pkg_toolpkg_empty_subpackages">This ToolPkg does not declare any subpackages</string>
     <string name="pkg_toolpkg_tool_count">Tools: %1$d</string>
@@ -7640,7 +7641,7 @@
     <string name="market_allow_public_updates_title">Allow anyone to update this plugin</string>
     <string name="market_allow_public_updates_desc">When enabled, other signed-in users can submit new versions for this plugin. Only the original publisher can change this switch.</string>
     <string name="artifact_publish_encrypt_title">Encrypt published asset</string>
-    <string name="artifact_publish_encrypt_desc">When enabled, the uploaded asset uses Operit protected format. Install and cache stay encrypted, and runtime reads decrypt automatically.</string>
+    <string name="artifact_publish_encrypt_desc">When enabled, scripts are AST-minified and package resources upload in Operit protected format. Install and cache stay encrypted, and runtime reads decrypt automatically.</string>
     <string name="artifact_publish_encrypt_confirmation">Encrypted publish: %1$s</string>
     <string name="market_login_required_hint">Log in to GitHub to manage and publish market content</string>
     <string name="available_scripts_market">Available Scripts</string>

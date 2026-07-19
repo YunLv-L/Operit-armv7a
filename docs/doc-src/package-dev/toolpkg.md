@@ -474,6 +474,85 @@ const jarPath = await ToolPkg.readResource('apktool_lib_jar', 'apktool-lib.jar')
 - `outputFileName` 可选；不传时会使用清单资源原始文件名。
 - 如果资源 `mime` 是目录类型（例如 `inode/directory`、`vnd.android.document/directory`），运行时会先把该目录压成 zip，再返回这个 zip 文件的绝对路径；默认文件名会自动补 `.zip`。
 
+## AssemblyScript WASM 模块
+
+企业插件可以在 `manifest.json` 中声明 AssemblyScript 编译得到的 `.wasm` 核心模块：
+
+```json
+{
+  "wasm_modules": [
+    {
+      "id": "core",
+      "path": "modules/core.wasm",
+      "exports": ["isPrime", "nthPrime"],
+      "source_language": "assemblyscript",
+      "abi": "assemblyscript"
+    }
+  ]
+}
+```
+
+建议结构：
+
+```text
+my_toolpkg/
+├── manifest.json
+├── package.json
+├── src/
+│   ├── main.ts
+│   └── wasm/
+│       ├── core.ts
+│       └── core.as.ts
+├── build/
+│   └── main.js
+└── modules/
+    └── core.wasm
+```
+
+AssemblyScript 核心模块示例 `src/wasm/core.as.ts`：
+
+```ts
+export function isPrime(n: i32): i32 {
+  if (n < 2) return 0;
+  for (let divisor: i32 = 2; divisor <= n / divisor; divisor += 1) {
+    if (n % divisor === 0) return 0;
+  }
+  return 1;
+}
+```
+
+编译示例：
+
+```bash
+npx asc src/wasm/core.as.ts --outFile modules/core.wasm --optimize
+```
+
+当前宿主会解析和校验 `wasm_modules`，并在加密发布时保护 `.wasm` 文件。插件的对外入口仍然是 JS `exports` 和 `ToolPkg.register...` 系列 API；作者入口建议写 `src/main.ts`，构建时生成宿主执行用的 `main.js`。
+
+TS facade 示例 `src/wasm/core.ts`：
+
+```ts
+export async function isPrime(n: number): Promise<boolean> {
+  const result = await ToolPkg.wasm.call("core", "isPrime", [{ type: "i32", value: n }]);
+  if (typeof result !== "number") {
+    throw new Error("core.isPrime returned a non-number result");
+  }
+  return result === 1;
+}
+```
+
+主入口示例 `src/main.ts`：
+
+```ts
+import { isPrime } from "./wasm/core";
+
+export async function run(params: { n: number }) {
+  return { is_prime: await isPrime(params.n) };
+}
+```
+
+当前 ABI 支持 `i32`、`i64`、`f32`、`f64`。`i64` 结果以字符串返回；传入 `i64` 时推荐使用字符串，避免 JS number 精度损失。
+
 ## 示例
 
 ### 注册工具箱 UI 模块

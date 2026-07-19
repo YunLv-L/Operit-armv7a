@@ -1048,6 +1048,7 @@
     <string name="pkg_toolpkg_subpackages">ToolPkg 子包</string>
     <string name="pkg_toolpkg_version">版本：%1$s</string>
     <string name="pkg_toolpkg_resources">资源数：%1$d</string>
+    <string name="pkg_toolpkg_wasm_modules">WASM 模块数：%1$d</string>
     <string name="pkg_toolpkg_ui_modules">UI 模块数：%1$d</string>
     <string name="pkg_toolpkg_workflow_templates">工作流模板数：%1$d</string>
     <string name="pkg_toolpkg_workspace_templates">工作区模板数：%1$d</string>
@@ -4309,7 +4310,7 @@
     <string name="market_allow_public_updates_title">允许所有人更新该插件</string>
     <string name="market_allow_public_updates_desc">开启后，其他登录用户也可以为该插件提交新版本；只有最初发布者可以修改这个开关。</string>
     <string name="artifact_publish_encrypt_title">加密发布</string>
-    <string name="artifact_publish_encrypt_desc">开启后，发布资源会以 Operit 保护格式上传；安装和缓存仍保留密文，运行读取时自动解密。</string>
+    <string name="artifact_publish_encrypt_desc">开启后，脚本会先进行 JS 语法树压缩，包内资源也会以 Operit 保护格式上传；安装和缓存仍保留密文，运行读取时自动解密。</string>
     <string name="artifact_publish_encrypt_confirmation">加密发布: %1$s</string>
     <string name="market_login_required_hint">登录 GitHub 后可管理和发布市场内容</string>
     <string name="user_avatar">用户头像</string>

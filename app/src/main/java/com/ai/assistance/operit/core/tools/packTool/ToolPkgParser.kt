@@ -34,6 +34,14 @@ internal data class ToolPkgResourceRuntime(
     val mime: String
 )
 
+internal data class ToolPkgWasmModuleRuntime(
+    val id: String,
+    val path: String,
+    val exports: List<String>,
+    val sourceLanguage: String,
+    val abi: String
+)
+
 internal data class ToolPkgUiModuleRuntime(
     val id: String,
     val runtime: String,
@@ -134,6 +142,7 @@ internal data class ToolPkgContainerRuntime(
     val sourcePath: String,
     val subpackages: List<ToolPkgSubpackageRuntime>,
     val resources: List<ToolPkgResourceRuntime>,
+    val wasmModules: List<ToolPkgWasmModuleRuntime>,
     val workflowTemplates: List<ToolPkgWorkflowTemplateRuntime>,
     val workspaceTemplates: List<ToolPkgWorkspaceTemplateRuntime>,
     val uiModules: List<ToolPkgUiModuleRuntime>,
@@ -177,6 +186,8 @@ internal data class ToolPkgManifest(
     @SerialName("enabled_by_default") val enabledByDefault: Boolean = true,
     val subpackages: List<ToolPkgManifestSubpackage> = emptyList(),
     val resources: List<ToolPkgManifestResource> = emptyList(),
+    @SerialName("wasm_modules")
+    val wasmModules: List<ToolPkgManifestWasmModule> = emptyList(),
     @SerialName("workflow_templates")
     val workflowTemplates: List<ToolPkgManifestWorkflowTemplate> = emptyList(),
     @SerialName("workspace_templates")
@@ -194,6 +205,15 @@ internal data class ToolPkgManifestResource(
     val key: String,
     val path: String,
     val mime: String = ""
+)
+
+@Serializable
+internal data class ToolPkgManifestWasmModule(
+    val id: String,
+    val path: String,
+    val exports: List<String> = emptyList(),
+    @SerialName("source_language") val sourceLanguage: String = "assemblyscript",
+    val abi: String = "assemblyscript"
 )
 
 internal data class ToolPkgRegisteredUiModule(
@@ -472,6 +492,68 @@ internal object ToolPkgArchiveParser {
                     key = resource.key,
                     path = normalizedPath,
                     mime = resource.mime
+                )
+            }
+
+        val wasmModuleIds = linkedSetOf<String>()
+        val wasmModules =
+            manifest.wasmModules.mapIndexed { index, module ->
+                val moduleId = module.id.trim()
+                if (moduleId.isBlank()) {
+                    throw IllegalArgumentException("wasm_modules[$index].id is required")
+                }
+                if (!wasmModuleIds.add(moduleId.lowercase())) {
+                    throw IllegalArgumentException("Duplicate wasm module id: $moduleId")
+                }
+                if (module.path.isBlank()) {
+                    throw IllegalArgumentException("wasm_modules[$index].path is required")
+                }
+                val normalizedPath =
+                    resolveManifestRelativeResourcePath(manifestBasePath, module.path)
+                        ?: throw IllegalArgumentException(
+                            "Invalid wasm module path: ${module.path}"
+                        )
+                if (!normalizedPath.endsWith(".wasm", ignoreCase = true)) {
+                    throw IllegalArgumentException(
+                        "wasm_modules[$index].path must point to a .wasm file: ${module.path}"
+                    )
+                }
+                if (!entryIndex.containsEntry(normalizedPath)) {
+                    throw IllegalArgumentException(
+                        "Cannot find wasm module path '${module.path}'"
+                    )
+                }
+
+                val exportNames = module.exports.map { exportName ->
+                    exportName.trim()
+                }
+                if (exportNames.any { it.isBlank() }) {
+                    throw IllegalArgumentException(
+                        "wasm_modules[$index].exports must not contain blank names"
+                    )
+                }
+                if (exportNames.map { it.lowercase() }.toSet().size != exportNames.size) {
+                    throw IllegalArgumentException(
+                        "wasm_modules[$index].exports contains duplicate names"
+                    )
+                }
+                val sourceLanguage = module.sourceLanguage.trim()
+                if (sourceLanguage.isBlank()) {
+                    throw IllegalArgumentException(
+                        "wasm_modules[$index].source_language is required"
+                    )
+                }
+                val abi = module.abi.trim()
+                if (abi.isBlank()) {
+                    throw IllegalArgumentException("wasm_modules[$index].abi is required")
+                }
+
+                ToolPkgWasmModuleRuntime(
+                    id = moduleId,
+                    path = normalizedPath,
+                    exports = exportNames,
+                    sourceLanguage = sourceLanguage,
+                    abi = abi
                 )
             }
 
@@ -1185,6 +1267,7 @@ internal object ToolPkgArchiveParser {
                 sourcePath = sourcePath,
                 subpackages = subpackageRuntimes,
                 resources = resources,
+                wasmModules = wasmModules,
                 workflowTemplates = workflowTemplates,
                 workspaceTemplates = workspaceTemplates,
                 uiModules = uiModules,

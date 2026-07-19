@@ -925,6 +925,7 @@
     <string name="pkg_toolpkg_subpackages">Subpacote ToolPkg</string>
     <string name="pkg_toolpkg_version">Versão: %1$s</string>
     <string name="pkg_toolpkg_resources">Número de recursos: %1$d</string>
+    <string name="pkg_toolpkg_wasm_modules">Módulos WASM: %1$d</string>
     <string name="pkg_toolpkg_ui_modules">Número de módulos de IU: %1$d</string>
     <string name="pkg_toolpkg_empty_subpackages">O ToolPkg não declara nenhum subpacote</string>
     <string name="pkg_toolpkg_tool_count">Número de ferramentas: %1$d</string>

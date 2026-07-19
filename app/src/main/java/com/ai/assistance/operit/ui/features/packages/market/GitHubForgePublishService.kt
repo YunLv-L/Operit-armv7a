@@ -131,6 +131,7 @@ class GitHubForgePublishService(
             val fileBytes =
                 if (request.encryptArtifact) {
                     ToolPkgProtection.protectArtifactFile(
+                        context = context,
                         sourceFile = sourceFile,
                         isToolPkg = descriptor.type == PublishArtifactType.PACKAGE
                     )

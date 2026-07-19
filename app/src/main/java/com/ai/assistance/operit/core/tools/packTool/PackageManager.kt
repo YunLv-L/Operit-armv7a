@@ -33,6 +33,7 @@ import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceConf
 import com.ai.assistance.operit.widget.ToolPkgDesktopWidgetHost
 import com.ai.assistance.operit.util.OperitPaths
 import com.ai.assistance.operit.util.ToolPkgProtection
+import com.ai.assistance.operit.util.ToolPkgWasmRuntime
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
@@ -119,13 +120,30 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         val version: String,
         val author: List<String>,
         val resourceCount: Int,
+        val wasmModuleCount: Int,
         val workflowTemplateCount: Int,
         val workspaceTemplateCount: Int,
         val uiModuleCount: Int,
+        val wasmModules: List<ToolPkgWasmModule>,
         val toolboxUiModules: List<ToolPkgToolboxUiModule>,
         val subpackages: List<ToolPkgSubpackageInfo>,
         val workflowTemplates: List<ToolPkgWorkflowTemplate>,
         val workspaceTemplates: List<ToolPkgWorkspaceTemplate>
+    )
+
+    data class ToolPkgWasmModule(
+        val id: String,
+        val path: String,
+        val exports: List<String>,
+        val sourceLanguage: String,
+        val abi: String
+    )
+
+    data class ToolPkgWasmModuleBytes(
+        val containerPackageName: String,
+        val moduleId: String,
+        val path: String,
+        val bytes: ByteArray
     )
 
     data class ToolPkgWorkflowTemplate(
@@ -415,6 +433,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
     private fun destroyToolPkgExecutionEngines(packageName: String) {
         val normalizedPackageName = normalizePackageName(packageName)
         toolPkgManager.destroyToolPkgExecutionEngines(normalizedPackageName)
+        ToolPkgWasmRuntime.closeAllForPackage(normalizedPackageName)
     }
 
     internal val toolPkgContainersInternal: MutableMap<String, ToolPkgContainerRuntime>
@@ -1551,6 +1570,20 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         )
     }
 
+    fun readToolPkgWasmModuleBytes(
+        packageNameOrSubpackageId: String,
+        moduleId: String,
+        exportName: String,
+        preferEnabledContainer: Boolean = true
+    ): ToolPkgWasmModuleBytes? {
+        return toolPkgFacade.readToolPkgWasmModuleBytes(
+            packageNameOrSubpackageId = packageNameOrSubpackageId,
+            moduleId = moduleId,
+            exportName = exportName,
+            preferEnabledContainer = preferEnabledContainer
+        )
+    }
+
     /**
      * Automatically enables built-in packages that are marked as enabled by default.
      * This ensures that essential or commonly used packages are available without
@@ -1906,14 +1939,44 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
             if (!resourceFile.isFile) {
                 false
             } else {
-                resourceFile.inputStream().use { input ->
-                    destinationFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
+                destinationFile.outputStream().use { output ->
+                    output.write(ToolPkgProtection.decryptIfNeeded(resourceFile.readBytes()))
                 }
                 true
             }
         }
+    }
+
+    internal fun copyToolPkgResourceDirectory(
+        runtime: ToolPkgContainerRuntime,
+        normalizedResourcePath: String,
+        destinationDir: File
+    ): Boolean {
+        val sourceDirectory = resolveToolPkgResourceFile(runtime, normalizedResourcePath) ?: return false
+        if (!sourceDirectory.isDirectory) {
+            return false
+        }
+        sourceDirectory
+            .walkTopDown()
+            .sortedBy { it.relativeTo(sourceDirectory).invariantSeparatorsPath }
+            .forEach { source ->
+                val relativePath = source.relativeTo(sourceDirectory).invariantSeparatorsPath
+                val destination = if (relativePath.isBlank()) destinationDir else File(destinationDir, relativePath)
+                if (source.isDirectory) {
+                    if (!destination.exists()) {
+                        destination.mkdirs()
+                    }
+                } else if (source.isFile) {
+                    val parent = destination.parentFile
+                    if (parent != null && !parent.exists()) {
+                        parent.mkdirs()
+                    }
+                    destination.outputStream().use { output ->
+                        output.write(ToolPkgProtection.decryptIfNeeded(source.readBytes()))
+                    }
+                }
+            }
+        return true
     }
 
     internal fun resolveToolPkgResourceFile(
@@ -1941,9 +2004,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
                         val entryName = file.relativeTo(zipRootParent).invariantSeparatorsPath
                         val entry = ZipEntry(entryName)
                         zipOutput.putNextEntry(entry)
-                        file.inputStream().use { input ->
-                            input.copyTo(zipOutput)
-                        }
+                        zipOutput.write(ToolPkgProtection.decryptIfNeeded(file.readBytes()))
                         zipOutput.closeEntry()
                     }
             }
@@ -2031,14 +2092,14 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
             return packageMetadata.copy(tools = tools, states = states)
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error parsing JS package: ${e.message}", e)
-            val fallbackKey = try {
+            val errorKey = try {
                 val metadataString = extractMetadataFromJs(jsContent)
                 val metadataJson = org.json.JSONObject(JsonValue.readHjson(metadataString).toString())
                 metadataJson.optString("name").takeIf { it.isNotBlank() } ?: "unknown"
             } catch (_: Exception) {
                 "unknown"
             }
-            onError(fallbackKey, e.stackTraceToString())
+            onError(errorKey, e.stackTraceToString())
             return null
         }
     }
@@ -3548,6 +3609,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
 
     /** Clean up resources when the manager is no longer needed */
     fun destroy() {
+        ToolPkgWasmRuntime.closeAll()
         toolPkgManager.destroy()
         mcpManager.shutdown()
     }

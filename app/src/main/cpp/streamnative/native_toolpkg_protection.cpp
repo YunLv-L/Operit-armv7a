@@ -11,15 +11,13 @@
 #include <string>
 #include <vector>
 
-#ifndef TOOLPKG_PROTECTION_SECRET
-#define TOOLPKG_PROTECTION_SECRET ""
-#endif
+#include "toolpkg_protection_secret.h"
 
 namespace {
 
-constexpr std::array<uint8_t, 8> kMagic = {'O', 'P', 'T', 'P', 'R', 'O', 'T', '1'};
-constexpr size_t kNonceSize = 16;
-constexpr size_t kTagSize = 32;
+constexpr std::array<uint8_t, 8> kMagic = {'O', 'P', 'T', 'P', 'R', 'O', 'T', 'A'};
+constexpr size_t kNonceSize = 12;
+constexpr size_t kTagSize = 16;
 constexpr size_t kHeaderSize = kMagic.size() + kNonceSize + kTagSize;
 
 constexpr std::array<uint32_t, 64> kSha256K = {
@@ -141,8 +139,12 @@ std::array<uint8_t, 32> hmacSha256(const std::vector<uint8_t>& key, const std::v
 }
 
 std::vector<uint8_t> protectionKey() {
-    const std::string secret = TOOLPKG_PROTECTION_SECRET;
-    return std::vector<uint8_t>(secret.begin(), secret.end());
+    std::vector<uint8_t> secret;
+    secret.reserve(kToolPkgProtectionSecretBytes.size());
+    for (uint8_t value : kToolPkgProtectionSecretBytes) {
+        secret.push_back(static_cast<uint8_t>(value ^ kToolPkgProtectionSecretMask));
+    }
+    return secret;
 }
 
 bool secretConfigured() {
@@ -169,40 +171,86 @@ bool fillRandom(uint8_t* data, size_t size) {
     return true;
 }
 
-std::vector<uint8_t> buildTagMessage(
-        const std::array<uint8_t, kNonceSize>& nonce,
-        const std::vector<uint8_t>& ciphertext) {
-    std::vector<uint8_t> message;
-    message.reserve(kMagic.size() + nonce.size() + ciphertext.size());
-    message.insert(message.end(), kMagic.begin(), kMagic.end());
-    message.insert(message.end(), nonce.begin(), nonce.end());
-    message.insert(message.end(), ciphertext.begin(), ciphertext.end());
-    return message;
+uint32_t load32Le(const uint8_t* data) {
+    return static_cast<uint32_t>(data[0]) |
+           (static_cast<uint32_t>(data[1]) << 8U) |
+           (static_cast<uint32_t>(data[2]) << 16U) |
+           (static_cast<uint32_t>(data[3]) << 24U);
 }
 
-std::array<uint8_t, 32> keystreamBlock(
-        const std::vector<uint8_t>& key,
+void store32Le(uint8_t* out, uint32_t value) {
+    out[0] = static_cast<uint8_t>(value & 0xffU);
+    out[1] = static_cast<uint8_t>((value >> 8U) & 0xffU);
+    out[2] = static_cast<uint8_t>((value >> 16U) & 0xffU);
+    out[3] = static_cast<uint8_t>((value >> 24U) & 0xffU);
+}
+
+uint32_t rotl(uint32_t value, uint32_t bits) {
+    return (value << bits) | (value >> (32U - bits));
+}
+
+void chachaQuarterRound(uint32_t& a, uint32_t& b, uint32_t& c, uint32_t& d) {
+    a += b;
+    d ^= a;
+    d = rotl(d, 16U);
+    c += d;
+    b ^= c;
+    b = rotl(b, 12U);
+    a += b;
+    d ^= a;
+    d = rotl(d, 8U);
+    c += d;
+    b ^= c;
+    b = rotl(b, 7U);
+}
+
+std::array<uint8_t, 64> chacha20Block(
+        const std::array<uint8_t, 32>& key,
         const std::array<uint8_t, kNonceSize>& nonce,
-        uint64_t counter) {
-    std::vector<uint8_t> message;
-    const char domain[] = "operit-toolpkg-stream-v1";
-    message.insert(message.end(), domain, domain + sizeof(domain) - 1U);
-    message.insert(message.end(), nonce.begin(), nonce.end());
-    for (int shift = 56; shift >= 0; shift -= 8) {
-        message.push_back(static_cast<uint8_t>((counter >> shift) & 0xffU));
+        uint32_t counter) {
+    std::array<uint32_t, 16> state = {
+            0x61707865U, 0x3320646eU, 0x79622d32U, 0x6b206574U,
+            load32Le(key.data()),
+            load32Le(key.data() + 4),
+            load32Le(key.data() + 8),
+            load32Le(key.data() + 12),
+            load32Le(key.data() + 16),
+            load32Le(key.data() + 20),
+            load32Le(key.data() + 24),
+            load32Le(key.data() + 28),
+            counter,
+            load32Le(nonce.data()),
+            load32Le(nonce.data() + 4),
+            load32Le(nonce.data() + 8)};
+
+    auto working = state;
+    for (int round = 0; round < 10; ++round) {
+        chachaQuarterRound(working[0], working[4], working[8], working[12]);
+        chachaQuarterRound(working[1], working[5], working[9], working[13]);
+        chachaQuarterRound(working[2], working[6], working[10], working[14]);
+        chachaQuarterRound(working[3], working[7], working[11], working[15]);
+        chachaQuarterRound(working[0], working[5], working[10], working[15]);
+        chachaQuarterRound(working[1], working[6], working[11], working[12]);
+        chachaQuarterRound(working[2], working[7], working[8], working[13]);
+        chachaQuarterRound(working[3], working[4], working[9], working[14]);
     }
-    return hmacSha256(key, message);
+
+    std::array<uint8_t, 64> out = {};
+    for (size_t index = 0; index < working.size(); ++index) {
+        store32Le(out.data() + index * 4U, working[index] + state[index]);
+    }
+    return out;
 }
 
-std::vector<uint8_t> xorWithKeystream(
+std::vector<uint8_t> chacha20Xor(
         const std::vector<uint8_t>& input,
-        const std::vector<uint8_t>& key,
+        const std::array<uint8_t, 32>& key,
         const std::array<uint8_t, kNonceSize>& nonce) {
     std::vector<uint8_t> output(input.size());
-    uint64_t counter = 0;
+    uint32_t counter = 1;
     size_t offset = 0;
     while (offset < input.size()) {
-        const auto block = keystreamBlock(key, nonce, counter++);
+        const auto block = chacha20Block(key, nonce, counter++);
         const size_t block_count = std::min(block.size(), input.size() - offset);
         for (size_t index = 0; index < block_count; ++index) {
             output[offset + index] = static_cast<uint8_t>(input[offset + index] ^ block[index]);
@@ -210,6 +258,203 @@ std::vector<uint8_t> xorWithKeystream(
         offset += block_count;
     }
     return output;
+}
+
+std::array<uint8_t, 32> deriveAeadKey() {
+    const auto secret = protectionKey();
+    std::vector<uint8_t> salt;
+    const char salt_text[] = "operit-toolpkg-protection-aead-salt";
+    salt.insert(salt.end(), salt_text, salt_text + sizeof(salt_text) - 1U);
+    const auto prk = hmacSha256(salt, secret);
+
+    std::vector<uint8_t> prk_key(prk.begin(), prk.end());
+    std::vector<uint8_t> info;
+    const char info_text[] = "operit-toolpkg-chacha20-poly1305";
+    info.insert(info.end(), info_text, info_text + sizeof(info_text) - 1U);
+    info.push_back(1U);
+
+    const auto okm = hmacSha256(prk_key, info);
+    return okm;
+}
+
+void appendPadding16(std::vector<uint8_t>& data, size_t original_size) {
+    const size_t padding = (16U - (original_size % 16U)) % 16U;
+    data.insert(data.end(), padding, 0U);
+}
+
+void appendLittleEndian64(std::vector<uint8_t>& data, uint64_t value) {
+    for (int shift = 0; shift < 64; shift += 8) {
+        data.push_back(static_cast<uint8_t>((value >> shift) & 0xffU));
+    }
+}
+
+std::vector<uint8_t> buildAssociatedData(const std::array<uint8_t, kNonceSize>& nonce) {
+    std::vector<uint8_t> associated_data;
+    associated_data.reserve(kMagic.size() + nonce.size());
+    associated_data.insert(associated_data.end(), kMagic.begin(), kMagic.end());
+    associated_data.insert(associated_data.end(), nonce.begin(), nonce.end());
+    return associated_data;
+}
+
+std::vector<uint8_t> buildPoly1305Input(
+        const std::vector<uint8_t>& associated_data,
+        const std::vector<uint8_t>& ciphertext) {
+    std::vector<uint8_t> input;
+    input.reserve(
+            associated_data.size() + ((16U - associated_data.size() % 16U) % 16U) +
+            ciphertext.size() + ((16U - ciphertext.size() % 16U) % 16U) + 16U);
+    input.insert(input.end(), associated_data.begin(), associated_data.end());
+    appendPadding16(input, associated_data.size());
+    input.insert(input.end(), ciphertext.begin(), ciphertext.end());
+    appendPadding16(input, ciphertext.size());
+    appendLittleEndian64(input, static_cast<uint64_t>(associated_data.size()));
+    appendLittleEndian64(input, static_cast<uint64_t>(ciphertext.size()));
+    return input;
+}
+
+std::array<uint8_t, 16> poly1305Mac(
+        const std::array<uint8_t, 32>& one_time_key,
+        const std::vector<uint8_t>& message) {
+    constexpr uint64_t kMask26 = 0x3ffffffU;
+    const uint32_t t0 = load32Le(one_time_key.data());
+    const uint32_t t1 = load32Le(one_time_key.data() + 4);
+    const uint32_t t2 = load32Le(one_time_key.data() + 8);
+    const uint32_t t3 = load32Le(one_time_key.data() + 12);
+
+    const uint64_t r0 = t0 & 0x3ffffffU;
+    const uint64_t r1 = ((t0 >> 26U) | (t1 << 6U)) & 0x3ffff03U;
+    const uint64_t r2 = ((t1 >> 20U) | (t2 << 12U)) & 0x3ffc0ffU;
+    const uint64_t r3 = ((t2 >> 14U) | (t3 << 18U)) & 0x3f03fffU;
+    const uint64_t r4 = (t3 >> 8U) & 0x00fffffU;
+
+    const uint64_t s1 = r1 * 5U;
+    const uint64_t s2 = r2 * 5U;
+    const uint64_t s3 = r3 * 5U;
+    const uint64_t s4 = r4 * 5U;
+
+    uint64_t h0 = 0;
+    uint64_t h1 = 0;
+    uint64_t h2 = 0;
+    uint64_t h3 = 0;
+    uint64_t h4 = 0;
+
+    size_t offset = 0;
+    while (offset < message.size()) {
+        std::array<uint8_t, 16> block = {};
+        const size_t remaining = std::min<size_t>(16U, message.size() - offset);
+        std::copy(message.begin() + static_cast<std::ptrdiff_t>(offset),
+                  message.begin() + static_cast<std::ptrdiff_t>(offset + remaining),
+                  block.begin());
+        const uint32_t hibit = remaining == 16U ? (1U << 24U) : 0U;
+        if (remaining < 16U) {
+            block[remaining] = 1U;
+        }
+
+        const uint32_t b0 = load32Le(block.data());
+        const uint32_t b1 = load32Le(block.data() + 4);
+        const uint32_t b2 = load32Le(block.data() + 8);
+        const uint32_t b3 = load32Le(block.data() + 12);
+
+        h0 += b0 & kMask26;
+        h1 += ((b0 >> 26U) | (b1 << 6U)) & kMask26;
+        h2 += ((b1 >> 20U) | (b2 << 12U)) & kMask26;
+        h3 += ((b2 >> 14U) | (b3 << 18U)) & kMask26;
+        h4 += (b3 >> 8U) | hibit;
+
+        uint64_t d0 = h0 * r0 + h1 * s4 + h2 * s3 + h3 * s2 + h4 * s1;
+        uint64_t d1 = h0 * r1 + h1 * r0 + h2 * s4 + h3 * s3 + h4 * s2;
+        uint64_t d2 = h0 * r2 + h1 * r1 + h2 * r0 + h3 * s4 + h4 * s3;
+        uint64_t d3 = h0 * r3 + h1 * r2 + h2 * r1 + h3 * r0 + h4 * s4;
+        uint64_t d4 = h0 * r4 + h1 * r3 + h2 * r2 + h3 * r1 + h4 * r0;
+
+        uint64_t c = d0 >> 26U;
+        h0 = d0 & kMask26;
+        d1 += c;
+        c = d1 >> 26U;
+        h1 = d1 & kMask26;
+        d2 += c;
+        c = d2 >> 26U;
+        h2 = d2 & kMask26;
+        d3 += c;
+        c = d3 >> 26U;
+        h3 = d3 & kMask26;
+        d4 += c;
+        c = d4 >> 26U;
+        h4 = d4 & kMask26;
+        h0 += c * 5U;
+        c = h0 >> 26U;
+        h0 &= kMask26;
+        h1 += c;
+
+        offset += remaining;
+    }
+
+    uint64_t c = h1 >> 26U;
+    h1 &= kMask26;
+    h2 += c;
+    c = h2 >> 26U;
+    h2 &= kMask26;
+    h3 += c;
+    c = h3 >> 26U;
+    h3 &= kMask26;
+    h4 += c;
+    c = h4 >> 26U;
+    h4 &= kMask26;
+    h0 += c * 5U;
+    c = h0 >> 26U;
+    h0 &= kMask26;
+    h1 += c;
+
+    uint64_t g0 = h0 + 5U;
+    c = g0 >> 26U;
+    g0 &= kMask26;
+    uint64_t g1 = h1 + c;
+    c = g1 >> 26U;
+    g1 &= kMask26;
+    uint64_t g2 = h2 + c;
+    c = g2 >> 26U;
+    g2 &= kMask26;
+    uint64_t g3 = h3 + c;
+    c = g3 >> 26U;
+    g3 &= kMask26;
+    const int64_t g4_signed = static_cast<int64_t>(h4 + c) - (1LL << 26U);
+    const uint64_t select_h = static_cast<uint64_t>(g4_signed >> 63U);
+    const uint64_t select_g = ~select_h;
+
+    h0 = (h0 & select_h) | (g0 & select_g);
+    h1 = (h1 & select_h) | (g1 & select_g);
+    h2 = (h2 & select_h) | (g2 & select_g);
+    h3 = (h3 & select_h) | (g3 & select_g);
+    h4 = (h4 & select_h) | (static_cast<uint64_t>(g4_signed) & select_g);
+
+    constexpr uint64_t kMask32 = 0xffffffffULL;
+    const uint64_t h0_word = (h0 | (h1 << 26U)) & kMask32;
+    const uint64_t h1_word = ((h1 >> 6U) | (h2 << 20U)) & kMask32;
+    const uint64_t h2_word = ((h2 >> 12U) | (h3 << 14U)) & kMask32;
+    const uint64_t h3_word = ((h3 >> 18U) | (h4 << 8U)) & kMask32;
+
+    const uint64_t f0 = h0_word + load32Le(one_time_key.data() + 16);
+    const uint64_t f1 = h1_word + load32Le(one_time_key.data() + 20) + (f0 >> 32U);
+    const uint64_t f2 = h2_word + load32Le(one_time_key.data() + 24) + (f1 >> 32U);
+    const uint64_t f3 = h3_word + load32Le(one_time_key.data() + 28) + (f2 >> 32U);
+
+    std::array<uint8_t, 16> tag = {};
+    store32Le(tag.data(), static_cast<uint32_t>(f0));
+    store32Le(tag.data() + 4, static_cast<uint32_t>(f1));
+    store32Le(tag.data() + 8, static_cast<uint32_t>(f2));
+    store32Le(tag.data() + 12, static_cast<uint32_t>(f3));
+    return tag;
+}
+
+std::array<uint8_t, kTagSize> chacha20Poly1305Tag(
+        const std::array<uint8_t, 32>& key,
+        const std::array<uint8_t, kNonceSize>& nonce,
+        const std::vector<uint8_t>& associated_data,
+        const std::vector<uint8_t>& ciphertext) {
+    const auto block0 = chacha20Block(key, nonce, 0U);
+    std::array<uint8_t, 32> one_time_key = {};
+    std::copy(block0.begin(), block0.begin() + static_cast<std::ptrdiff_t>(one_time_key.size()), one_time_key.begin());
+    return poly1305Mac(one_time_key, buildPoly1305Input(associated_data, ciphertext));
 }
 
 bool constantTimeEquals(const uint8_t* left, const uint8_t* right, size_t size) {
@@ -251,15 +496,16 @@ void throwJava(JNIEnv* env, const char* class_name, const char* message) {
 }
 
 std::vector<uint8_t> encryptBytes(JNIEnv* env, const std::vector<uint8_t>& plaintext) {
-    const auto key = protectionKey();
-    if (key.empty()) {
+    if (!secretConfigured()) {
         throwJava(env, "java/lang/IllegalStateException", "ToolPkg protection secret is not configured");
         return {};
     }
+    const auto key = deriveAeadKey();
     std::array<uint8_t, kNonceSize> nonce = {};
     fillRandom(nonce.data(), nonce.size());
-    const auto ciphertext = xorWithKeystream(plaintext, key, nonce);
-    const auto tag = hmacSha256(key, buildTagMessage(nonce, ciphertext));
+    const auto ciphertext = chacha20Xor(plaintext, key, nonce);
+    const auto associated_data = buildAssociatedData(nonce);
+    const auto tag = chacha20Poly1305Tag(key, nonce, associated_data, ciphertext);
 
     std::vector<uint8_t> output;
     output.reserve(kHeaderSize + ciphertext.size());
@@ -271,8 +517,7 @@ std::vector<uint8_t> encryptBytes(JNIEnv* env, const std::vector<uint8_t>& plain
 }
 
 std::vector<uint8_t> decryptBytes(JNIEnv* env, const std::vector<uint8_t>& protected_bytes) {
-    const auto key = protectionKey();
-    if (key.empty()) {
+    if (!secretConfigured()) {
         throwJava(env, "java/lang/IllegalStateException", "ToolPkg protection secret is not configured");
         return {};
     }
@@ -291,12 +536,14 @@ std::vector<uint8_t> decryptBytes(JNIEnv* env, const std::vector<uint8_t>& prote
     std::vector<uint8_t> ciphertext(
             protected_bytes.begin() + static_cast<std::ptrdiff_t>(kHeaderSize),
             protected_bytes.end());
-    const auto expected_tag = hmacSha256(key, buildTagMessage(nonce, ciphertext));
+    const auto key = deriveAeadKey();
+    const auto associated_data = buildAssociatedData(nonce);
+    const auto expected_tag = chacha20Poly1305Tag(key, nonce, associated_data, ciphertext);
     if (!constantTimeEquals(provided_tag, expected_tag.data(), expected_tag.size())) {
         throwJava(env, "java/lang/SecurityException", "Protected payload authentication failed");
         return {};
     }
-    return xorWithKeystream(ciphertext, key, nonce);
+    return chacha20Xor(ciphertext, key, nonce);
 }
 
 }  // namespace
