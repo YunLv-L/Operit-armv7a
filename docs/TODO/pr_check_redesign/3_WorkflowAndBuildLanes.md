@@ -27,7 +27,7 @@ PR 只产生一个 `Candidate checks` job，并按作用域顺序执行：
 - 纯翻译改动不启动完整 assemble
 - fork PR 日志和产物中不存在仓库 secret
 - Android 构建只初始化当前存在且实际需要的公共 submodule
-- ToolPkg 使用 `tools/sync_example_packages.py`
+- ToolPkg 使用 `tools/example_packages/sync_example_packages.py`
 - WASM ToolPkg 按独立 lockfile 执行 AssemblyScript、TypeScript 和归档构建
 - ToolPkg manifest 声明的入口和 WASM 文件必须存在、非空并实际写入归档
 - GitHub TypeScript 示例必须重建且与提交的 `examples/github.js` 一致
