@@ -246,7 +246,7 @@ fun ChatArea(
         }
     }
 
-    LaunchedEffect(autoScrollToBottom, messagesCount, hasNewerDisplayHistory, isLoadingDisplayWindow) {
+    LaunchedEffect(autoScrollToBottom, messagesCount, hasNewerDisplayHistory, isLoadingDisplayWindow, lastMessage?.content?.length) {
         if (
             autoScrollToBottom &&
                 hasNewerDisplayHistory &&
