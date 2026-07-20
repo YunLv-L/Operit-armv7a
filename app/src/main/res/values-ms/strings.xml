@@ -729,6 +729,7 @@
     <string name="pkg_toolpkg_subpackages">Subpakej ToolPkg</string>
     <string name="pkg_toolpkg_version">Versi: %1$s</string>
     <string name="pkg_toolpkg_resources">Bilangan sumber: %1$d</string>
+    <string name="pkg_toolpkg_wasm_modules">Bilangan modul WASM: %1$d</string>
     <string name="pkg_toolpkg_ui_modules">Bilangan modul UI: %1$d</string>
     <string name="pkg_toolpkg_empty_subpackages">ToolPkg ini tidak mengisytiharkan sebarang subpakej</string>
     <string name="pkg_toolpkg_tool_count">Bilangan alat: %1$d</string>
@@ -1301,6 +1302,9 @@
     <string name="accessibility_wizard_open_settings">Buka Tetapan Aksesibiliti</string>
     <string name="accessibility_wizard_success_message">Tahniah! Perkhidmatan aksesibiliti berjaya dikonfigurasi, kini AI boleh menganalisis dan mengendalikan kandungan skrin.</string>
     <string name="copy_message">Salin Mesej</string>
+    <string name="markdown_source">Sumber Markdown</string>
+    <string name="copy_plain_text">Salin teks biasa</string>
+    <string name="copy_markdown_source">Salin sumber Markdown</string>
     <string name="info">Maklumat</string>
     <string name="read_message">Bacakan Mesej</string>
     <string name="auto_read_message">Bacaan Automatik</string>

@@ -39,9 +39,11 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -91,15 +93,19 @@ import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Summarize
 import androidx.compose.ui.draw.alpha
 import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkParser
+import com.ai.assistance.operit.ui.common.markdown.markdownToPlainTextForCopy
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.CursorStyleChatMessage
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleImageStyleConfig
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleStyleChatMessage
 import com.ai.assistance.operit.util.ChatMarkupRegex
+import com.ai.assistance.operit.util.LatexMathMlConverter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 清理复制文本中的内部标记，保留Markdown格式和纯文本内容
@@ -1128,6 +1134,24 @@ private fun MessageCopyPreviewBottomSheet(
     val clipboardManager = LocalClipboardManager.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val textScrollState = rememberScrollState()
+    var showPlainText by remember(text) { mutableStateOf(true) }
+    var plainText by remember(text) { mutableStateOf<String?>(null) }
+    LaunchedEffect(text, context) {
+        plainText =
+            withContext(Dispatchers.Default) {
+                markdownToPlainTextForCopy(text) { formulas ->
+                    LatexMathMlConverter.convertAll(context, formulas)
+                }
+            }
+    }
+    val displayedText = if (showPlainText) plainText.orEmpty() else text
+    val copyButtonText =
+        if (showPlainText) {
+            stringResource(R.string.copy_plain_text)
+        } else {
+            stringResource(R.string.copy_markdown_source)
+        }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -1143,27 +1167,55 @@ private fun MessageCopyPreviewBottomSheet(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
-            SelectionContainer(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 520.dp)
-                    .verticalScroll(textScrollState)
-                    .padding(bottom = 12.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 12.dp)
             ) {
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth()
+                FilterChip(
+                    selected = showPlainText,
+                    onClick = { showPlainText = true },
+                    label = { Text(stringResource(R.string.plain_text)) }
                 )
+                FilterChip(
+                    selected = !showPlainText,
+                    onClick = { showPlainText = false },
+                    label = { Text(stringResource(R.string.markdown_source)) }
+                )
+            }
+            if (showPlainText && plainText == null) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .padding(bottom = 12.dp)
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                SelectionContainer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 520.dp)
+                        .verticalScroll(textScrollState)
+                        .padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        text = displayedText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
                 TextButton(
+                    enabled = !showPlainText || plainText != null,
                     onClick = {
-                        clipboardManager.setText(AnnotatedString(text))
+                        clipboardManager.setText(AnnotatedString(displayedText))
                         Toast.makeText(
                             context,
                             context.getString(R.string.message_copied_to_clipboard),
@@ -1171,7 +1223,7 @@ private fun MessageCopyPreviewBottomSheet(
                         ).show()
                     }
                 ) {
-                    Text(text = stringResource(id = R.string.copy_message))
+                    Text(text = copyButtonText)
                 }
             }
         }

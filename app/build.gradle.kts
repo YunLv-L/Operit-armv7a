@@ -146,7 +146,11 @@ android {
         aidl = true
         buildConfig = true
     }
-    
+    lint {
+        baseline = file("lint-baseline.xml")
+        checkDependencies = true
+    }
+
     packaging {
         
         jniLibs {
