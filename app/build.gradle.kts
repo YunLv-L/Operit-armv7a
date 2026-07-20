@@ -150,7 +150,7 @@ android {
         baseline = file("lint-baseline.xml")
         checkDependencies = true
     }
-    
+
     packaging {
         
         jniLibs {
