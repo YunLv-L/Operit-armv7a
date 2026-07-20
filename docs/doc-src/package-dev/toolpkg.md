@@ -527,7 +527,7 @@ export function isPrime(n: i32): i32 {
 npx asc src/wasm/core.as.ts --outFile modules/core.wasm --optimize
 ```
 
-当前宿主会解析和校验 `wasm_modules`，并在加密发布时保护 `.wasm` 文件。插件的对外入口仍然是 JS `exports` 和 `ToolPkg.register...` 系列 API；作者入口建议写 `src/main.ts`，构建时生成宿主执行用的 `main.js`。
+当前宿主会解析和校验 `wasm_modules`。插件的对外入口仍然是 JS `exports` 和 `ToolPkg.register...` 系列 API；作者入口建议写 `src/main.ts`，构建时生成宿主执行用的 `main.js`。
 
 TS facade 示例 `src/wasm/core.ts`：
 
@@ -739,9 +739,9 @@ ToolPkg.registerSummaryGenerateHook({
 
 如果你在开发 ToolPkg，需要注意：
 
-- 普通 `.js` 包可以用 `tools/execute_js.bat` / `tools/execute_js.sh` 做单次执行调试
+- 普通 `.js` 包可以用 `tools/adb/execute_js.bat` / `tools/adb/execute_js.sh` 做单次执行调试
 - `toolpkg` 不适合这样调试，因为它涉及 `manifest`、`main` 注册、ToolPkg cache、以及多类 hook/runtime 的重新同步
-- 调试 ToolPkg 时，应使用 `tools/debug_toolpkg.bat` / `tools/debug_toolpkg.sh` / `tools/debug_toolpkg.py`
+- 调试 ToolPkg 时，应使用 `tools/toolpkg/debug_toolpkg.bat` / `tools/toolpkg/debug_toolpkg.sh` / `tools/toolpkg/debug_toolpkg.py`
 
 完整的打包、烧录、启用、刷新 hook/runtime 的工作流说明，见 [TOOLPKG_FORMAT_GUIDE.md](../../TOOLPKG_FORMAT_GUIDE.md) 中的“10.3 使用调试安装脚本快速烧录到手机”。
 

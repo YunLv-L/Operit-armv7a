@@ -358,6 +358,9 @@ data class MarketV2Asset(
     val kind: String = "",
     val url: String = "",
     val sha256: String = "",
+    val ghOwner: String = "",
+    val ghRepo: String = "",
+    val ghReleaseTag: String = "",
     val name: String = "",
     val assetName: String = ""
 )
@@ -479,21 +482,6 @@ data class MarketV2PublishAsset(
 private data class MarketV2CommentCreateRequest(
     val body: String,
     val parentId: String? = null
-)
-
-@Serializable
-private data class MarketV2PublishProofRequest(
-    val owner: String,
-    val repo: String,
-    val releaseTag: String,
-    val assetName: String,
-    val sha256: String
-)
-
-@Serializable
-private data class MarketV2PublishProofResponse(
-    val ok: Boolean = false,
-    val proof: String = ""
 )
 
 class MarketStatsApiService {
@@ -864,41 +852,6 @@ class MarketStatsApiService {
                     label = "getNotifications limit=$limit offset=$offset"
                 ) { body, _ ->
                     json.decodeFromString(MarketV2NotificationsResponse.serializer(), body).items
-                }
-            }
-        }
-
-    suspend fun publishProof(
-        owner: String,
-        repo: String,
-        releaseTag: String,
-        assetName: String,
-        sha256: String
-    ): Result<String> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val requestJson =
-                    json.encodeToString(
-                        MarketV2PublishProofRequest(
-                            owner = owner,
-                            repo = repo,
-                            releaseTag = releaseTag,
-                            assetName = assetName,
-                            sha256 = sha256
-                        )
-                    )
-                requestDynamic(
-                    method = "POST",
-                    pathSegments = listOf("market", "v2", "publish", "proof"),
-                    body = requestJson,
-                    label = "publishProof owner=$owner repo=$repo"
-                ) { body, _ ->
-                    val response =
-                        json.decodeFromString(MarketV2PublishProofResponse.serializer(), body)
-                    require(response.ok && response.proof.isNotBlank()) {
-                        "Market proof generation failed"
-                    }
-                    response.proof
                 }
             }
         }

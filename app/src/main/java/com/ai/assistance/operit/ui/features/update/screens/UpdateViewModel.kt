@@ -60,13 +60,14 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
      */
     private fun parseReleaseToUpdateInfo(release: GitHubRelease, isLatest: Boolean): UpdateInfo {
         // 解析发布时间
+        val publishedAt = requireNotNull(release.published_at)
         val date = try {
             val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
             val outputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val parsedDate = inputFormat.parse(release.published_at)
-            parsedDate?.let { outputFormat.format(it) } ?: release.published_at.substring(0, 10)
+            val parsedDate = inputFormat.parse(publishedAt)
+            parsedDate?.let { outputFormat.format(it) } ?: publishedAt.substring(0, 10)
         } catch (e: Exception) {
-            release.published_at.substring(0, 10)
+            publishedAt.substring(0, 10)
         }
         
         // 解析release body

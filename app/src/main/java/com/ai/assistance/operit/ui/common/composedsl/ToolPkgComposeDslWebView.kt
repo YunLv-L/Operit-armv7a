@@ -48,7 +48,6 @@ import com.ai.assistance.operit.core.tools.packTool.ToolPkgComposeDslNode
 import com.ai.assistance.operit.core.tools.packTool.ToolPkgComposeDslParser
 import com.ai.assistance.operit.ui.features.token.webview.WebViewConfig
 import com.ai.assistance.operit.util.AppLogger
-import com.ai.assistance.operit.util.ToolPkgProtection
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -1190,10 +1189,10 @@ private fun buildComposeDslWebResourceResponse(
                         runCatching {
                             java.nio.charset.Charset.forName(spec.encoding)
                         }.getOrDefault(Charsets.UTF_8)
-                    val html = ToolPkgProtection.decryptIfNeeded(file.readBytes()).toString(charset)
+                    val html = file.readBytes().toString(charset)
                     injectComposeDslWebViewBridgeRuntimeIntoHtml(html).toByteArray(charset)
                 } else {
-                    ToolPkgProtection.decryptIfNeeded(file.readBytes())
+                    file.readBytes()
                 }
             }
 

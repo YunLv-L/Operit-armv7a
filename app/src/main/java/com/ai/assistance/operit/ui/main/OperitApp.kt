@@ -26,6 +26,7 @@ import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.announcement.RemoteAnnouncementDisplay
 import com.ai.assistance.operit.data.announcement.RemoteAnnouncementRepository
 import com.ai.assistance.operit.data.mcp.MCPRepository
+import com.ai.assistance.operit.data.security.PluginDenylistRepository
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.RemoteAnnouncementPreferences
@@ -103,6 +104,7 @@ fun OperitApp(
     }
     val remoteAnnouncementRepository = remember { RemoteAnnouncementRepository() }
     val remoteAnnouncementPreferences = remember { RemoteAnnouncementPreferences(context) }
+    val pluginDenylistRepository = remember { PluginDenylistRepository(appContext) }
     var navigationRevision by remember { mutableStateOf(0) }
     val configuration = LocalConfiguration.current
     val navigationModel = remember(context, configuration, navigationRevision) { AppRouteCatalog.build(context) }
@@ -374,9 +376,14 @@ fun OperitApp(
         }
     }
 
-    // Fetch remote announcement when network becomes available.
     LaunchedEffect(isNetworkAvailable) {
-        if (!isNetworkAvailable || remoteAnnouncement != null) return@LaunchedEffect
+        if (!isNetworkAvailable) return@LaunchedEffect
+
+        launch {
+            pluginDenylistRepository.refreshFromRemote()
+        }
+
+        if (remoteAnnouncement != null) return@LaunchedEffect
 
         val announcement = remoteAnnouncementRepository.fetchDisplayableAnnouncement()
         if (announcement != null && remoteAnnouncementPreferences.shouldShow(announcement.version)) {

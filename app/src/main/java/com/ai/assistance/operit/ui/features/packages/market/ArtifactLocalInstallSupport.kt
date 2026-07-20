@@ -59,7 +59,12 @@ fun PackageManager.getInstalledArtifactSnapshots(
             LocalInstalledArtifactSnapshot(
                 packageName = packageName,
                 // Built-in packages do not always have a stable external source file path.
-                sha256 = if (sourceFile != null && sourceFile.exists() && sourceFile.isFile) sha256Hex(sourceFile) else "",
+                sha256 =
+                    if (sourceFile != null && sourceFile.exists() && sourceFile.isFile) {
+                        sha256Hex(sourceFile)
+                    } else {
+                        ""
+                    },
                 isBuiltIn = toolPackage.isBuiltIn
             )
         }

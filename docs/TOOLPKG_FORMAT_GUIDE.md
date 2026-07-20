@@ -4,6 +4,8 @@
 
 **ToolPkg** 是 Operit 项目中用于打包和分发工具包的标准格式。它允许开发者将多个相关的工具脚本、资源文件和 UI 模块打包成一个单一的、易于分发和管理的文件。
 
+本文档的格式、manifest 与运行时说明适用于所有 ToolPkg 作者。文中 `tools/toolpkg/debug_toolpkg.*` 的命令仅面向拥有 Operit 源码仓库和 ADB 的桌面开发环境；应用内 AI 协作开发应先更新 `SandboxPackage_DEV`，并遵循其本地 `SKILL.md` 指定的目录与调试方式。
+
 ### 1.1 什么是 ToolPkg？
 
 - **文件格式**：`.toolpkg` 文件本质上是一个标准的 ZIP 压缩包
@@ -164,6 +166,10 @@ windows_control.toolpkg (ZIP 压缩包)
 | `workflow_templates` | array | 否 | 注册到宿主“工作流”入口的工作流模板列表 |
 | `workspace_templates` | array | 否 | 注册到宿主“工作区创建”入口的工作区模板列表 |
 
+#### 压缩发布
+
+发布时可选择对 ToolPkg 的可执行 JavaScript 条目进行 AST 压缩。压缩后的产物仍是普通 ZIP，保持原有市场下载、外部导入和调试安装方式。
+
 #### 3.2.2 LocalizedText 类型
 
 `LocalizedText` 支持两种格式：
@@ -283,7 +289,7 @@ npx asc src/wasm/core.as.ts --outFile modules/core.wasm --optimize
 当前接入范围：
 
 - `manifest` 会校验模块 ID、`.wasm` 路径和导出名。
-- 加密发布时，`.wasm` 与其他包内资源一起进入保护格式，运行期按 manifest 元数据读取并解密。
+- 发布时可选择对包内可执行 JavaScript 进行 AST 压缩；`.wasm` 与其他资源保持标准 ToolPkg ZIP 内容。
 - JS 运行时仍以 `main.js` 和已有 `exports` 为插件对外接口；`main.js` 可以由 TS 构建生成。
 - `ToolPkg.wasm.call(moduleId, exportName, args)` 已接入 native WAMR runtime，当前 ABI 支持 `i32`、`i64`、`f32`、`f64` 数值参数和返回值。
 - `i64` 结果以字符串返回；JS 传入 `i64` 时推荐使用字符串，避免超过 JS safe integer 后丢精度。
@@ -783,25 +789,25 @@ Compress-Archive -Path my_toolpkg\* -DestinationPath my_toolpkg.toolpkg
 
 ### 4.2 使用 Python 脚本自动打包
 
-项目提供了 `tools/sync_example_packages.py` 脚本，可以自动将 `examples/` 目录下的包打包成 `.toolpkg` 文件。
+项目提供了 `tools/example_packages/sync_example_packages.py` 脚本，可以自动将 `examples/` 目录下的包打包成 `.toolpkg` 文件。
 
 **使用方法**：
 
 ```bash
 # 打包所有白名单中的包
-python tools/sync_example_packages.py
+python tools/example_packages/sync_example_packages.py
 
 # 以“非白名单附加”的方式打包特定包
-python tools/sync_example_packages.py --include windows_control
+python tools/example_packages/sync_example_packages.py --include windows_control
 
 # 例如只额外同步 template_try 这个示例
-python tools/sync_example_packages.py --include template_try
+python tools/example_packages/sync_example_packages.py --include template_try
 
 # 查看打包结果（不实际写入）
-python tools/sync_example_packages.py --dry-run
+python tools/example_packages/sync_example_packages.py --dry-run
 
 # 删除不在白名单中的包
-python tools/sync_example_packages.py --delete-extra
+python tools/example_packages/sync_example_packages.py --delete-extra
 ```
 
 **工作原理**：
@@ -1276,7 +1282,7 @@ my_toolpkg/
 
 1. **使用 dry-run 模式**：
    ```bash
-   python tools/sync_example_packages.py --dry-run
+   python tools/example_packages/sync_example_packages.py --dry-run
    ```
 
 2. **查看应用日志**：
@@ -1294,7 +1300,7 @@ my_toolpkg/
 
 ### 10.3 使用调试安装脚本快速烧录到手机
 
-普通 `.js` 包可以直接用 `tools/execute_js.bat` / `tools/execute_js.sh` 临时推送后单次执行；但 `toolpkg` 不适合这样调试。
+普通 `.js` 包可以直接用 `tools/adb/execute_js.bat` / `tools/adb/execute_js.sh` 临时推送后单次执行；但 `toolpkg` 不适合这样调试。
 
 原因是 `toolpkg` 不只是“跑一个函数”，它还涉及：
 
@@ -1308,9 +1314,9 @@ my_toolpkg/
 
 项目现在提供了专门的调试安装脚本：
 
-- Windows：`tools/debug_toolpkg.bat`
-- Linux/macOS：`tools/debug_toolpkg.sh`
-- 共享实现：`tools/debug_toolpkg.py`
+- Windows：`tools/toolpkg/debug_toolpkg.bat`
+- Linux/macOS：`tools/toolpkg/debug_toolpkg.sh`
+- 共享实现：`tools/toolpkg/debug_toolpkg.py`
 
 它们会执行以下流程：
 
@@ -1337,34 +1343,34 @@ my_toolpkg/
 直接传 ToolPkg 目录：
 
 ```bash
-python tools/debug_toolpkg.py examples/windows_control
+python tools/toolpkg/debug_toolpkg.py examples/windows_control
 ```
 
 也可以传 `manifest.json`：
 
 ```bash
-python tools/debug_toolpkg.py examples/windows_control/manifest.json
+python tools/toolpkg/debug_toolpkg.py examples/windows_control/manifest.json
 ```
 
 或者传现成 `.toolpkg`：
 
 ```bash
-python tools/debug_toolpkg.py /path/to/windows_control.toolpkg
+python tools/toolpkg/debug_toolpkg.py /path/to/windows_control.toolpkg
 ```
 
 Windows 下可直接使用：
 
 ```bat
-tools\debug_toolpkg.bat examples\windows_control
-tools\debug_toolpkg.bat examples\windows_control\manifest.json
-tools\debug_toolpkg.bat D:\tmp\windows_control.toolpkg --device emulator-5554
+tools\toolpkg\debug_toolpkg.bat examples\windows_control
+tools\toolpkg\debug_toolpkg.bat examples\windows_control\manifest.json
+tools\toolpkg\debug_toolpkg.bat D:\tmp\windows_control.toolpkg --device emulator-5554
 ```
 
 Linux/macOS 下可直接使用：
 
 ```bash
-bash tools/debug_toolpkg.sh examples/windows_control
-bash tools/debug_toolpkg.sh examples/windows_control/manifest.json
+bash tools/toolpkg/debug_toolpkg.sh examples/windows_control
+bash tools/toolpkg/debug_toolpkg.sh examples/windows_control/manifest.json
 ```
 
 #### 10.3.2 常用参数
@@ -1425,7 +1431,7 @@ windows_control/
 
 ```bash
 # 打包 windows_control
-python tools/sync_example_packages.py --include windows_control
+python tools/example_packages/sync_example_packages.py --include windows_control
 
 # 查看打包结果
 ls -lh app/src/main/assets/packages/windows_control.toolpkg

@@ -85,8 +85,8 @@ npm run build:examples:github
 git diff --exit-code -- examples/github.js
 npm --prefix examples/toolpkg_wasm_demo ci
 npm --prefix examples/toolpkg_wasm_demo run pack:toolpkg
-python3 ./tools/sync_example_packages.py --mode test --no-hot-reload
-python3 ./tools/sync_example_packages.py --no-hot-reload
+python3 ./tools/example_packages/sync_example_packages.py --mode test --no-hot-reload
+python3 ./tools/example_packages/sync_example_packages.py --no-hot-reload
 
 # Android JVM 单测、lint 和构建
 ./gradlew :app:testDebugUnitTest

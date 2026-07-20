@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.ui.features.packages.market
 
 import com.ai.assistance.operit.BuildConfig
+import com.ai.assistance.operit.data.api.GitHubRelease
 import com.ai.assistance.operit.data.api.MarketV2Entry
 import java.io.File
 import kotlinx.serialization.Serializable
@@ -86,6 +87,7 @@ enum class PublishProgressStage {
     ENSURING_REPO,
     CREATING_RELEASE,
     UPLOADING_ASSET,
+    RESOLVING_RELEASE_ASSET,
     REGISTERING_MARKET,
     COMPLETED
 }
@@ -106,6 +108,29 @@ data class LocalPublishableArtifact(
     val hasDeclaredAuthorField: Boolean = false,
     val declaredAuthorSlotCount: Int = 0,
     val inferredVersion: String? = null
+)
+
+sealed interface PublishArtifactSource {
+    data class DirectUpload(
+        val minifyArtifact: Boolean
+    ) : PublishArtifactSource
+
+    data class GitHubReleaseAsset(
+        val owner: String,
+        val repository: String,
+        val releaseTag: String,
+        val assetName: String
+    ) : PublishArtifactSource
+}
+
+data class GitHubReleaseRepository(
+    val owner: String,
+    val repository: String
+)
+
+data class GitHubReleaseCatalog(
+    val repository: GitHubReleaseRepository,
+    val releases: List<GitHubRelease>
 )
 
 data class ArtifactPublishClusterContext(
@@ -151,7 +176,8 @@ data class MarketRegistrationPayload(
     val projectDescription: String,
     val runtimePackageId: String,
     val publisherLogin: String,
-    val forgeRepo: String,
+    val releaseOwner: String,
+    val releaseRepository: String,
     val releaseTag: String,
     val assetName: String,
     val downloadUrl: String,
@@ -188,7 +214,8 @@ data class ArtifactMarketMetadata(
     val maxSupportedAppVersion: String? = null,
     val protection: String? = null,
     val normalizedId: String = "",
-    val forgeRepo: String = ""
+    val releaseOwner: String = "",
+    val releaseRepository: String = ""
 )
 
 fun ArtifactMarketMetadata.effectiveProjectId(): String {
@@ -394,6 +421,8 @@ fun buildArtifactMarketMetadata(
         projectDescription = payload.projectDescription,
         runtimePackageId = payload.runtimePackageId,
         publisherLogin = payload.publisherLogin,
+        releaseOwner = payload.releaseOwner,
+        releaseRepository = payload.releaseRepository,
         releaseTag = payload.releaseTag,
         assetName = payload.assetName,
         downloadUrl = payload.downloadUrl,

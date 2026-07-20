@@ -5,7 +5,6 @@ import android.provider.DocumentsContract
 import com.ai.assistance.operit.core.tools.LocalizedText
 import com.ai.assistance.operit.core.tools.StringOrStringListSerializer
 import com.ai.assistance.operit.core.tools.ToolPackage
-import com.ai.assistance.operit.util.ToolPkgProtection
 import java.io.File
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
@@ -1391,11 +1390,29 @@ internal object ToolPkgArchiveParser {
         entryIndex: ToolPkgEntryIndex,
         rawPath: String
     ): String? {
+        return readZipEntryBytes(archive, entryIndex, rawPath)
+            ?.toString(StandardCharsets.UTF_8)
+    }
+
+    fun readZipEntryBytes(
+        archive: ZipFile,
+        entryIndex: ToolPkgEntryIndex,
+        rawPath: String
+    ): ByteArray? {
         val archiveEntryName = entryIndex.resolveEntryName(rawPath) ?: return null
         val entry = archive.getEntry(archiveEntryName) ?: return null
-        archive.getInputStream(entry).use { input ->
-            return ToolPkgProtection.decodeUtf8(input.readBytes())
-        }
+        return archive.getInputStream(entry).use { input -> input.readBytes() }
+    }
+
+    fun readZipEntryPrefix(
+        archive: ZipFile,
+        entryIndex: ToolPkgEntryIndex,
+        rawPath: String,
+        byteCount: Int
+    ): ByteArray? {
+        val archiveEntryName = entryIndex.resolveEntryName(rawPath) ?: return null
+        val entry = archive.getEntry(archiveEntryName) ?: return null
+        return archive.getInputStream(entry).use { input -> readPrefix(input, byteCount) }
     }
 
     fun readDirectoryEntryText(
@@ -1403,12 +1420,49 @@ internal object ToolPkgArchiveParser {
         entryIndex: ToolPkgEntryIndex,
         rawPath: String
     ): String? {
+        return readDirectoryEntryBytes(rootDir, entryIndex, rawPath)
+            ?.toString(StandardCharsets.UTF_8)
+    }
+
+    fun readDirectoryEntryBytes(
+        rootDir: File,
+        entryIndex: ToolPkgEntryIndex,
+        rawPath: String
+    ): ByteArray? {
         val relativePath = entryIndex.resolveEntryName(rawPath) ?: return null
         val file = File(rootDir, relativePath)
         if (!file.isFile) {
             return null
         }
-        return ToolPkgProtection.decodeUtf8(file.readBytes())
+        return file.readBytes()
+    }
+
+    fun readDirectoryEntryPrefix(
+        rootDir: File,
+        entryIndex: ToolPkgEntryIndex,
+        rawPath: String,
+        byteCount: Int
+    ): ByteArray? {
+        val relativePath = entryIndex.resolveEntryName(rawPath) ?: return null
+        val file = File(rootDir, relativePath)
+        if (!file.isFile) {
+            return null
+        }
+        return file.inputStream().use { input -> readPrefix(input, byteCount) }
+    }
+
+    private fun readPrefix(input: InputStream, byteCount: Int): ByteArray {
+        require(byteCount > 0) { "byteCount must be positive" }
+        val prefix = ByteArray(byteCount)
+        var offset = 0
+        while (offset < prefix.size) {
+            val read = input.read(prefix, offset, prefix.size - offset)
+            if (read <= 0) {
+                break
+            }
+            offset += read
+        }
+        return if (offset == prefix.size) prefix else prefix.copyOf(offset)
     }
 
     fun readToolPkgManifestPreview(inputStreamFactory: () -> InputStream): ToolPkgManifestPreview? {

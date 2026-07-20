@@ -26,6 +26,9 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -52,6 +55,7 @@ import com.ai.assistance.operit.data.api.MarketV2ManifestCategory
 import com.ai.assistance.operit.ui.features.packages.market.ArtifactMarketScope
 import com.ai.assistance.operit.ui.features.packages.market.ArtifactPublishClusterContext
 import com.ai.assistance.operit.ui.features.packages.market.GitHubForgePublishService
+import com.ai.assistance.operit.ui.features.packages.market.PublishArtifactSource
 import com.ai.assistance.operit.ui.features.packages.market.PublishArtifactType
 import com.ai.assistance.operit.ui.features.packages.market.PublishProgressStage
 import com.ai.assistance.operit.ui.features.packages.market.isOperit2VersionAllowed
@@ -130,6 +134,9 @@ fun ArtifactPublishScreen(
     val publishSuccess by viewModel.publishSuccessMessage.collectAsState()
     val requiresForgeInitialization by viewModel.requiresForgeInitialization.collectAsState()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val githubReleaseCatalog by viewModel.githubReleaseCatalog.collectAsState()
+    val githubReleaseCatalogError by viewModel.githubReleaseCatalogError.collectAsState()
+    val isLoadingGitHubReleaseCatalog by viewModel.isLoadingGitHubReleaseCatalog.collectAsState()
 
     val initialInfo = remember(editingEntry) { editingEntry?.toArtifactPublishEditInfo() }
     var mutablePublishContext by remember(isEditMode, publishContext) {
@@ -178,12 +185,18 @@ fun ArtifactPublishScreen(
     var allowPublicUpdates by rememberSaveable(initialInfo?.allowPublicUpdates) {
         mutableStateOf(initialInfo?.allowPublicUpdates ?: true)
     }
-    var encryptArtifact by rememberSaveable { mutableStateOf(false) }
+    var minifyArtifact by rememberSaveable { mutableStateOf(false) }
+    var useGitHubReleaseAsset by rememberSaveable { mutableStateOf(false) }
+    var githubRepositoryUrl by rememberSaveable { mutableStateOf("") }
+    var selectedReleaseTag by rememberSaveable { mutableStateOf("") }
+    var selectedReleaseAssetName by rememberSaveable { mutableStateOf("") }
     var version by rememberSaveable { mutableStateOf(initialInfo?.version.orEmpty().ifBlank { "1.0.0" }) }
     var minSupportedAppVersion by rememberSaveable { mutableStateOf(initialInfo?.minSupportedAppVersion.orEmpty()) }
     var maxSupportedAppVersion by rememberSaveable { mutableStateOf(initialInfo?.maxSupportedAppVersion.orEmpty()) }
 
     var selectorExpanded by remember { mutableStateOf(false) }
+    var releaseSelectorExpanded by remember { mutableStateOf(false) }
+    var releaseAssetSelectorExpanded by remember { mutableStateOf(false) }
     var categoryExpanded by remember { mutableStateOf(false) }
     var categories by remember { mutableStateOf<List<MarketV2ManifestCategory>>(emptyList()) }
     var showConfirmationDialog by remember { mutableStateOf(false) }
@@ -238,6 +251,26 @@ fun ArtifactPublishScreen(
                 }
         } else {
             selectedArtifact?.displayName.orEmpty()
+        }
+    val selectedGitHubRelease =
+        githubReleaseCatalog?.releases?.firstOrNull { it.tag_name == selectedReleaseTag }
+    val selectedGitHubReleaseAsset =
+        selectedGitHubRelease?.assets?.firstOrNull { it.name == selectedReleaseAssetName }
+    val publishSource =
+        if (!useGitHubReleaseAsset) {
+            PublishArtifactSource.DirectUpload(minifyArtifact = minifyArtifact)
+        } else {
+            val repository = githubReleaseCatalog?.repository
+            if (repository != null && selectedGitHubRelease != null && selectedGitHubReleaseAsset != null) {
+                PublishArtifactSource.GitHubReleaseAsset(
+                    owner = repository.owner,
+                    repository = repository.repository,
+                    releaseTag = selectedGitHubRelease.tag_name,
+                    assetName = selectedGitHubReleaseAsset.name
+                )
+            } else {
+                null
+            }
         }
 
     Column(
@@ -461,6 +494,146 @@ fun ArtifactPublishScreen(
             }
         }
 
+        if (!isEditMode) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.artifact_publish_asset_source_title),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = !useGitHubReleaseAsset,
+                        onClick = {
+                            viewModel.clearPendingMarketRegistrationRetry()
+                            useGitHubReleaseAsset = false
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        label = { Text(stringResource(R.string.artifact_publish_asset_source_upload)) }
+                    )
+                    SegmentedButton(
+                        selected = useGitHubReleaseAsset,
+                        onClick = {
+                            viewModel.clearPendingMarketRegistrationRetry()
+                            useGitHubReleaseAsset = true
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        label = { Text(stringResource(R.string.artifact_publish_asset_source_github_release)) }
+                    )
+                }
+                if (useGitHubReleaseAsset) {
+                    OutlinedTextField(
+                        value = githubRepositoryUrl,
+                        onValueChange = {
+                            viewModel.clearPendingMarketRegistrationRetry()
+                            githubRepositoryUrl = it
+                        },
+                        label = { Text(stringResource(R.string.artifact_publish_github_repository_url)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            selectedReleaseTag = ""
+                            selectedReleaseAssetName = ""
+                            viewModel.loadGitHubReleaseCatalog(githubRepositoryUrl)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = githubRepositoryUrl.isNotBlank() && !isLoadingGitHubReleaseCatalog
+                    ) {
+                        if (isLoadingGitHubReleaseCatalog) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(stringResource(R.string.artifact_publish_load_github_releases))
+                    }
+                    githubReleaseCatalogError?.let { error ->
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    githubReleaseCatalog?.let { catalog ->
+                        ExposedDropdownMenuBox(
+                            expanded = releaseSelectorExpanded,
+                            onExpandedChange = { releaseSelectorExpanded = !releaseSelectorExpanded }
+                        ) {
+                            OutlinedTextField(
+                                value = selectedGitHubRelease?.name.orEmpty().ifBlank { selectedReleaseTag },
+                                onValueChange = {},
+                                label = { Text(stringResource(R.string.artifact_publish_github_release)) },
+                                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                readOnly = true,
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = releaseSelectorExpanded)
+                                }
+                            )
+                            ExposedDropdownMenu(
+                                expanded = releaseSelectorExpanded,
+                                onDismissRequest = { releaseSelectorExpanded = false }
+                            ) {
+                                catalog.releases.forEach { release ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(release.name.orEmpty().ifBlank { release.tag_name })
+                                                Text(
+                                                    text = release.tag_name,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            viewModel.clearPendingMarketRegistrationRetry()
+                                            selectedReleaseTag = release.tag_name
+                                            selectedReleaseAssetName = ""
+                                            releaseSelectorExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        selectedGitHubRelease?.let { release ->
+                            ExposedDropdownMenuBox(
+                                expanded = releaseAssetSelectorExpanded,
+                                onExpandedChange = { releaseAssetSelectorExpanded = !releaseAssetSelectorExpanded }
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedGitHubReleaseAsset?.name.orEmpty(),
+                                    onValueChange = {},
+                                    label = { Text(stringResource(R.string.artifact_publish_github_release_asset)) },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                    readOnly = true,
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = releaseAssetSelectorExpanded)
+                                    }
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = releaseAssetSelectorExpanded,
+                                    onDismissRequest = { releaseAssetSelectorExpanded = false }
+                                ) {
+                                    release.assets.forEach { asset ->
+                                        DropdownMenuItem(
+                                            text = { Text(asset.name) },
+                                            onClick = {
+                                                viewModel.clearPendingMarketRegistrationRetry()
+                                                selectedReleaseAssetName = asset.name
+                                                releaseAssetSelectorExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         OutlinedTextField(
             value = displayName,
             onValueChange = {
@@ -576,7 +749,7 @@ fun ArtifactPublishScreen(
                 }
             }
         }
-        if (!isEditMode) {
+        if (!isEditMode && !useGitHubReleaseAsset) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -588,20 +761,30 @@ fun ArtifactPublishScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         Text(
-                            text = stringResource(R.string.artifact_publish_encrypt_title),
+                            text =
+                                if (selectedType == PublishArtifactType.PACKAGE) {
+                                    stringResource(R.string.artifact_publish_encrypt_market_toolpkg_title)
+                                } else {
+                                    stringResource(R.string.artifact_publish_encrypt_title)
+                                },
                             style = MaterialTheme.typography.titleSmall
                         )
                         Text(
-                            text = stringResource(R.string.artifact_publish_encrypt_desc),
+                            text =
+                                if (selectedType == PublishArtifactType.PACKAGE) {
+                                    stringResource(R.string.artifact_publish_encrypt_market_toolpkg_desc)
+                                } else {
+                                    stringResource(R.string.artifact_publish_encrypt_desc)
+                                },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
-                        checked = encryptArtifact,
+                        checked = minifyArtifact,
                         onCheckedChange = {
                             viewModel.clearPendingMarketRegistrationRetry()
-                            encryptArtifact = it
+                            minifyArtifact = it
                         }
                     )
                 }
@@ -704,6 +887,7 @@ fun ArtifactPublishScreen(
                             initialInfo?.type != null
                         } else {
                             selectedPackageName.isNotBlank() &&
+                                publishSource != null &&
                                 (activePublishContext == null || filteredArtifacts.isNotEmpty())
                         }
                     )
@@ -789,14 +973,30 @@ fun ArtifactPublishScreen(
                         Text(stringResource(R.string.version_colon, version))
                         Text(
                             stringResource(
-                                R.string.artifact_publish_encrypt_confirmation,
-                                if (encryptArtifact) {
-                                    stringResource(R.string.enabled)
+                                R.string.artifact_publish_asset_source_confirmation,
+                                if (useGitHubReleaseAsset) {
+                                    stringResource(R.string.artifact_publish_asset_source_github_release)
                                 } else {
-                                    stringResource(R.string.disabled)
+                                    stringResource(R.string.artifact_publish_asset_source_upload)
                                 }
                             )
                         )
+                        if (!useGitHubReleaseAsset) {
+                            Text(
+                                stringResource(
+                                    if (selectedType == PublishArtifactType.PACKAGE) {
+                                        R.string.artifact_publish_encrypt_market_toolpkg_confirmation
+                                    } else {
+                                        R.string.artifact_publish_encrypt_confirmation
+                                    },
+                                    if (minifyArtifact) {
+                                        stringResource(R.string.enabled)
+                                    } else {
+                                        stringResource(R.string.disabled)
+                                    }
+                                )
+                            )
+                        }
                         Text(
                             stringResource(
                                 R.string.artifact_type_colon,
@@ -833,19 +1033,22 @@ fun ArtifactPublishScreen(
                                 maxSupportedAppVersion = maxSupportedAppVersion.ifBlank { GitHubForgePublishService.DEFAULT_MAX_SUPPORTED_APP_VERSION }
                             )
                         } else {
-                            viewModel.requestPublish(
-                                packageName = selectedPackageName,
-                                displayName = displayName,
-                                description = description,
-                                detail = detail,
-                                categoryId = categoryId,
-                                allowPublicUpdates = allowPublicUpdates,
-                                version = version,
-                                minSupportedAppVersion = minSupportedAppVersion.ifBlank { null },
-                                maxSupportedAppVersion = maxSupportedAppVersion.ifBlank { GitHubForgePublishService.DEFAULT_MAX_SUPPORTED_APP_VERSION },
-                                publishContext = activePublishContext,
-                                encryptArtifact = encryptArtifact
-                            )
+                            val selectedSource = publishSource
+                            if (selectedSource != null) {
+                                viewModel.requestPublish(
+                                    packageName = selectedPackageName,
+                                    displayName = displayName,
+                                    description = description,
+                                    detail = detail,
+                                    categoryId = categoryId,
+                                    allowPublicUpdates = allowPublicUpdates,
+                                    version = version,
+                                    minSupportedAppVersion = minSupportedAppVersion.ifBlank { null },
+                                    maxSupportedAppVersion = maxSupportedAppVersion.ifBlank { GitHubForgePublishService.DEFAULT_MAX_SUPPORTED_APP_VERSION },
+                                    publishContext = activePublishContext,
+                                    source = selectedSource
+                                )
+                            }
                         }
                     }
                 ) {

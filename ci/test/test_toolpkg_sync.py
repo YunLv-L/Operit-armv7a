@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "tools"))
+sys.path.insert(0, str(REPO_ROOT / "tools" / "example_packages"))
 
 from sync_example_packages import _manifest_runtime_files, _pack_toolpkg_folder  # noqa: E402
 

@@ -55,7 +55,7 @@ on:
       - terminal
       - tools/native_ripgrep/**
       - tools/packages_whitelist.txt
-      - tools/sync_example_packages.py
+      - tools/example_packages/sync_example_packages.py
       - web-chat/**
 
 concurrency:
@@ -189,7 +189,7 @@ jobs:
         run: |
           npm run build:examples:github
           git diff --exit-code -- examples/github.js
-          python3 tools/sync_example_packages.py --no-hot-reload
+          python3 tools/example_packages/sync_example_packages.py --no-hot-reload
 
       - name: Configure Android build
         env:
