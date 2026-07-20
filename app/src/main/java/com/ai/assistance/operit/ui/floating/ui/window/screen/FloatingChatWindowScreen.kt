@@ -704,6 +704,7 @@ private fun ChatMessagesView(
             .asReversed()
     val messageHeightMemory = rememberChatMessageHeightMemory(displayMessages)
     val coroutineScope = rememberCoroutineScope()
+    val lastMessage = floatContext.messages.lastOrNull()
     val userMessageColor = MaterialTheme.colorScheme.primaryContainer
     val aiMessageColor = MaterialTheme.colorScheme.surface
     val userTextColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -724,6 +725,7 @@ private fun ChatMessagesView(
         autoScrollToBottom,
         hasNewerDisplayHistory,
         isLoadingDisplayWindow,
+        lastMessage?.content?.length,
     ) {
         if (autoScrollToBottom && hasNewerDisplayHistory && !isLoadingDisplayWindow && chatCore != null) {
             chatCore.showLatestMessagesForCurrentChat()
@@ -736,7 +738,6 @@ private fun ChatMessagesView(
     val isLoading =
         inputProcessingState !is InputProcessingState.Idle &&
             inputProcessingState !is InputProcessingState.Completed
-    val lastMessage = floatContext.messages.lastOrNull()
     val showLoadingIndicator =
         isLoading &&
             (

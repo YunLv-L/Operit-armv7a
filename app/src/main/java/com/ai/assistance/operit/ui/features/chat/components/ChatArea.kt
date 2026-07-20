@@ -246,7 +246,14 @@ fun ChatArea(
         }
     }
 
-    LaunchedEffect(autoScrollToBottom, messagesCount, hasNewerDisplayHistory, isLoadingDisplayWindow, lastMessage?.content?.length) {
+    val lastMessageContentLength = lastMessage?.content?.length
+    LaunchedEffect(
+        autoScrollToBottom,
+        messagesCount,
+        hasNewerDisplayHistory,
+        isLoadingDisplayWindow,
+        lastMessageContentLength,
+    ) {
         if (
             autoScrollToBottom &&
                 hasNewerDisplayHistory &&
