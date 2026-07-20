@@ -103,7 +103,7 @@ test("toolpkg_hook_runner invokes worldbook system prompt hook with prepared sto
   const outputText = execFileSync(
     process.execPath,
     [
-      "tools/toolpkg_hook_runner.js",
+      "tools/toolpkg/toolpkg_hook_runner.js",
       "--source",
       "examples/worldbook",
       "--kind",

@@ -105,7 +105,7 @@ data class GitHubRelease(
     val body: String?,
     val html_url: String,
     val upload_url: String? = null,
-    val published_at: String,
+    val published_at: String? = null,
     val created_at: String,
     val prerelease: Boolean = false,
     val draft: Boolean = false,
@@ -729,6 +729,26 @@ class GitHubApiService(private val context: Context) {
                 Result.success(json.decodeFromString(GitHubRelease.serializer(), responseBody))
             } else {
                 Result.failure(buildHttpException(response.code, response.message, responseBody))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun downloadReleaseAsset(downloadUrl: String): Result<ByteArray> = withContext(Dispatchers.IO) {
+        try {
+            val requestBuilder = Request.Builder().url(downloadUrl)
+            authPreferences.getAuthorizationHeader()?.let { authHeader ->
+                requestBuilder.addHeader("Authorization", authHeader)
+            }
+
+            client.newCall(requestBuilder.build()).execute().use { response ->
+                val responseBody = response.body
+                if (response.isSuccessful && responseBody != null) {
+                    Result.success(responseBody.bytes())
+                } else {
+                    Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)

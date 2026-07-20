@@ -68,7 +68,7 @@ const importFixturePath = node_path_1.default.resolve(process.cwd(), "examples",
         metadata: {}
     }, null, 2), "utf8");
     const outputText = (0, node_child_process_1.execFileSync)(process.execPath, [
-        "tools/toolpkg_hook_runner.js",
+        "tools/toolpkg/toolpkg_hook_runner.js",
         "--source",
         "examples/worldbook",
         "--kind",

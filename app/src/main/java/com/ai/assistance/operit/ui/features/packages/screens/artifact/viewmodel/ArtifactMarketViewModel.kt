@@ -17,11 +17,12 @@ import com.ai.assistance.operit.data.api.MarketV2Entry
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
 import com.ai.assistance.operit.ui.features.packages.market.ArtifactMarketScope
 import com.ai.assistance.operit.ui.features.packages.market.ArtifactPublishClusterContext
-import com.ai.assistance.operit.ui.features.packages.market.ForgeRepoInfo
 import com.ai.assistance.operit.ui.features.packages.market.GitHubForgePublishService
+import com.ai.assistance.operit.ui.features.packages.market.GitHubReleaseCatalog
 import com.ai.assistance.operit.ui.features.packages.market.LocalPublishableArtifact
 import com.ai.assistance.operit.ui.features.packages.market.MarketRegistrationPayload
 import com.ai.assistance.operit.ui.features.packages.market.PublishArtifactRequest
+import com.ai.assistance.operit.ui.features.packages.market.PublishArtifactSource
 import com.ai.assistance.operit.ui.features.packages.market.PublishArtifactType
 import com.ai.assistance.operit.ui.features.packages.market.PublishAttemptResult
 import com.ai.assistance.operit.ui.features.packages.market.PublishProgressStage
@@ -79,6 +80,15 @@ class ArtifactMarketViewModel(
 
     private val _requiresForgeInitialization = MutableStateFlow(false)
     val requiresForgeInitialization: StateFlow<Boolean> = _requiresForgeInitialization.asStateFlow()
+
+    private val _githubReleaseCatalog = MutableStateFlow<GitHubReleaseCatalog?>(null)
+    val githubReleaseCatalog: StateFlow<GitHubReleaseCatalog?> = _githubReleaseCatalog.asStateFlow()
+
+    private val _githubReleaseCatalogError = MutableStateFlow<String?>(null)
+    val githubReleaseCatalogError: StateFlow<String?> = _githubReleaseCatalogError.asStateFlow()
+
+    private val _isLoadingGitHubReleaseCatalog = MutableStateFlow(false)
+    val isLoadingGitHubReleaseCatalog: StateFlow<Boolean> = _isLoadingGitHubReleaseCatalog.asStateFlow()
 
     val isLoggedIn: StateFlow<Boolean> =
         githubAuth.isLoggedInFlow.stateIn(
@@ -154,7 +164,7 @@ class ArtifactMarketViewModel(
         minSupportedAppVersion: String?,
         maxSupportedAppVersion: String?,
         publishContext: ArtifactPublishClusterContext? = null,
-        encryptArtifact: Boolean = false
+        source: PublishArtifactSource
     ) {
         val localArtifact = _publishableArtifacts.value.firstOrNull { it.packageName == packageName }
         if (localArtifact == null) {
@@ -180,9 +190,27 @@ class ArtifactMarketViewModel(
                 minSupportedAppVersion = minSupportedAppVersion,
                 maxSupportedAppVersion = maxSupportedAppVersion,
                 publishContext = publishContext,
-                encryptArtifact = encryptArtifact
+                source = source
             )
         executePublish(request, allowCreateForgeRepo = false)
+    }
+
+    fun loadGitHubReleaseCatalog(repositoryUrl: String) {
+        viewModelScope.launch {
+            _isLoadingGitHubReleaseCatalog.value = true
+            _githubReleaseCatalogError.value = null
+            forgePublishService.loadGitHubReleaseCatalog(repositoryUrl).fold(
+                onSuccess = { catalog ->
+                    _githubReleaseCatalog.value = catalog
+                },
+                onFailure = { error ->
+                    _githubReleaseCatalog.value = null
+                    _githubReleaseCatalogError.value = error.message ?: "Failed to load GitHub Releases"
+                    AppLogger.e(TAG, "Failed to load GitHub Release catalog", error)
+                }
+            )
+            _isLoadingGitHubReleaseCatalog.value = false
+        }
     }
 
     fun updatePublishedArtifact(
@@ -343,7 +371,7 @@ class ArtifactMarketViewModel(
                             is PublishAttemptResult.Success -> {
                                 pendingPublishRequest = null
                                 _publishProgressStage.value = PublishProgressStage.COMPLETED
-                                _publishSuccessMessage.value = buildSuccessMessage(result.forgeRepo, result.payload)
+                                _publishSuccessMessage.value = buildSuccessMessage(result.payload)
                             }
 
                             is PublishAttemptResult.RegistrationFailed -> {
@@ -421,7 +449,8 @@ class ArtifactMarketViewModel(
             projectDescription = trimmedDetail,
             runtimePackageId = versionValue?.runtimePackageId.orEmpty(),
             publisherLogin = entry.publisher?.login.orEmpty().ifBlank { entry.author?.login.orEmpty() },
-            forgeRepo = "",
+            releaseOwner = "",
+            releaseRepository = "",
             releaseTag = "",
             assetName = assetName,
             downloadUrl = assetValue?.url.orEmpty(),
@@ -549,14 +578,15 @@ class ArtifactMarketViewModel(
             PublishProgressStage.ENSURING_REPO -> getText(R.string.artifact_publish_stage_ensuring_repo)
             PublishProgressStage.CREATING_RELEASE -> getText(R.string.artifact_publish_stage_creating_release)
             PublishProgressStage.UPLOADING_ASSET -> getText(R.string.artifact_publish_stage_uploading_asset)
+            PublishProgressStage.RESOLVING_RELEASE_ASSET -> getText(R.string.artifact_publish_stage_resolving_release_asset)
             PublishProgressStage.REGISTERING_MARKET -> getText(R.string.artifact_publish_stage_registering_market)
             PublishProgressStage.COMPLETED -> getText(R.string.artifact_publish_stage_completed)
         }
     }
 
-    private fun buildSuccessMessage(forgeRepo: ForgeRepoInfo, payload: MarketRegistrationPayload): String {
+    private fun buildSuccessMessage(payload: MarketRegistrationPayload): String {
         return appendMarketScheduleNotice(
-            "${payload.displayName} published to ${forgeRepo.ownerLogin}/${forgeRepo.repoName} ${payload.releaseTag} " +
+            "${payload.displayName} published to ${payload.releaseOwner}/${payload.releaseRepository} ${payload.releaseTag} " +
                 formatSupportedAppVersions(payload.minSupportedAppVersion, payload.maxSupportedAppVersion)
         )
     }

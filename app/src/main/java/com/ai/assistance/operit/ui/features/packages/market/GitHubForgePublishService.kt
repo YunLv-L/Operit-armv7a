@@ -11,8 +11,9 @@ import com.ai.assistance.operit.data.api.MarketV2PublishRequest
 import com.ai.assistance.operit.data.api.MarketV2PublishVersion
 import com.ai.assistance.operit.data.api.MarketV2Version
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
-import com.ai.assistance.operit.util.ToolPkgProtection
+import com.ai.assistance.operit.util.ToolPkgArtifactMinifier
 import java.io.File
+import java.net.URI
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,7 +29,7 @@ data class PublishArtifactRequest(
     val minSupportedAppVersion: String?,
     val maxSupportedAppVersion: String?,
     val publishContext: ArtifactPublishClusterContext? = null,
-    val encryptArtifact: Boolean = false
+    val source: PublishArtifactSource
 )
 
 sealed class PublishAttemptResult {
@@ -38,7 +39,6 @@ sealed class PublishAttemptResult {
 
     data class Success(
         val entry: MarketV2Entry,
-        val forgeRepo: ForgeRepoInfo,
         val release: GitHubRelease,
         val asset: GitHubReleaseAsset,
         val payload: MarketRegistrationPayload
@@ -60,6 +60,33 @@ class GitHubForgePublishService(
         val release: GitHubRelease,
         val created: Boolean
     )
+
+    private data class ResolvedReleaseAsset(
+        val owner: String,
+        val repository: String,
+        val release: GitHubRelease,
+        val asset: GitHubReleaseAsset,
+        val sha256: String,
+        val releaseWasCreated: Boolean?
+    )
+
+    suspend fun loadGitHubReleaseCatalog(repositoryUrl: String): Result<GitHubReleaseCatalog> =
+        withContext(Dispatchers.IO) {
+            try {
+                val repository = parseGitHubRepositoryUrl(repositoryUrl)
+                githubApiService.getRepositoryReleases(
+                    owner = repository.owner,
+                    repo = repository.repository
+                ).map { releases ->
+                    GitHubReleaseCatalog(
+                        repository = repository,
+                        releases = releases.filter { !it.draft }
+                    )
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
 
     suspend fun publishArtifact(
         request: PublishArtifactRequest,
@@ -84,21 +111,6 @@ class GitHubForgePublishService(
                     return@withContext Result.failure(error)
                 }
 
-            onProgress(PublishProgressStage.ENSURING_REPO)
-            val forgeRepoResult =
-                ensureForgeRepository(
-                    publisherLogin = currentUser.login,
-                    allowCreateForgeRepo = allowCreateForgeRepo
-                ).getOrElse { error ->
-                    return@withContext Result.failure(error)
-                }
-
-            if (forgeRepoResult == null) {
-                return@withContext Result.success(
-                    PublishAttemptResult.NeedsForgeInitialization(currentUser.login)
-                )
-            }
-
             val descriptor =
                 buildPublishArtifactDescriptor(
                     type = request.localArtifact.type,
@@ -111,74 +123,106 @@ class GitHubForgePublishService(
                     allowPublicUpdates = request.allowPublicUpdates,
                     minSupportedAppVersion = request.minSupportedAppVersion,
                     maxSupportedAppVersion = request.maxSupportedAppVersion,
-                    publishContext = request.publishContext,
-                    protection = if (request.encryptArtifact) ToolPkgProtection.PROTECTION_ID else null
+                    publishContext = request.publishContext
                 )
-            val releaseDescriptor = buildPublishReleaseDescriptor(descriptor)
 
-            onProgress(PublishProgressStage.CREATING_RELEASE)
-            val ensuredRelease =
-                ensureRelease(
-                    owner = currentUser.login,
-                    repo = forgeRepoResult.repoName,
-                    releaseDescriptor = releaseDescriptor
-                ).getOrElse { error ->
-                    return@withContext Result.failure(error)
-                }
-            val release = ensuredRelease.release
+            val resolvedAsset =
+                when (val source = request.source) {
+                    is PublishArtifactSource.DirectUpload -> {
+                        onProgress(PublishProgressStage.ENSURING_REPO)
+                        val forgeRepo =
+                            ensureForgeRepository(
+                                publisherLogin = currentUser.login,
+                                allowCreateForgeRepo = allowCreateForgeRepo
+                            ).getOrElse { error ->
+                                return@withContext Result.failure(error)
+                            }
 
-            onProgress(PublishProgressStage.UPLOADING_ASSET)
-            val fileBytes =
-                if (request.encryptArtifact) {
-                    ToolPkgProtection.protectArtifactFile(
-                        context = context,
-                        sourceFile = sourceFile,
-                        isToolPkg = descriptor.type == PublishArtifactType.PACKAGE
-                    )
-                } else {
-                    sourceFile.readBytes()
-                }
-            val uploadedAsset =
-                uploadAssetReplacingExisting(
-                    owner = currentUser.login,
-                    repo = forgeRepoResult.repoName,
-                    release = release,
-                    descriptor = descriptor,
-                    content = fileBytes
-                ).getOrElse { error ->
-                    return@withContext Result.failure(error)
-                }
+                        if (forgeRepo == null) {
+                            return@withContext Result.success(
+                                PublishAttemptResult.NeedsForgeInitialization(currentUser.login)
+                            )
+                        }
 
-            val computedSha256 = sha256Hex(fileBytes)
+                        val releaseDescriptor = buildPublishReleaseDescriptor(descriptor)
+                        onProgress(PublishProgressStage.CREATING_RELEASE)
+                        val ensuredRelease =
+                            ensureRelease(
+                                owner = currentUser.login,
+                                repo = forgeRepo.repoName,
+                                releaseDescriptor = releaseDescriptor
+                            ).getOrElse { error ->
+                                return@withContext Result.failure(error)
+                            }
+
+                        onProgress(PublishProgressStage.UPLOADING_ASSET)
+                        val fileBytes =
+                            if (source.minifyArtifact) {
+                                ToolPkgArtifactMinifier.minifyArtifactFile(
+                                    context = context,
+                                    sourceFile = sourceFile,
+                                    isToolPkg = descriptor.type == PublishArtifactType.PACKAGE
+                                )
+                            } else {
+                                sourceFile.readBytes()
+                            }
+                        val uploadedAsset =
+                            uploadAssetReplacingExisting(
+                                owner = currentUser.login,
+                                repo = forgeRepo.repoName,
+                                release = ensuredRelease.release,
+                                descriptor = descriptor,
+                                content = fileBytes
+                            ).getOrElse { error ->
+                                return@withContext Result.failure(error)
+                            }
+
+                        ResolvedReleaseAsset(
+                            owner = currentUser.login,
+                            repository = forgeRepo.repoName,
+                            release = ensuredRelease.release,
+                            asset = uploadedAsset,
+                            sha256 = sha256Hex(fileBytes),
+                            releaseWasCreated = ensuredRelease.created
+                        )
+                    }
+
+                    is PublishArtifactSource.GitHubReleaseAsset -> {
+                        onProgress(PublishProgressStage.RESOLVING_RELEASE_ASSET)
+                        val release =
+                            githubApiService.getReleaseByTag(
+                                owner = source.owner,
+                                repo = source.repository,
+                                tag = source.releaseTag
+                            ).getOrElse { error ->
+                                return@withContext Result.failure(error)
+                            }
+                        val asset =
+                            release.assets.firstOrNull { it.name == source.assetName }
+                                ?: return@withContext Result.failure(
+                                    IllegalStateException("Selected GitHub Release asset was not found")
+                                )
+                        val assetBytes =
+                            githubApiService.downloadReleaseAsset(asset.browser_download_url).getOrElse { error ->
+                                return@withContext Result.failure(error)
+                            }
+                        val remoteSha256 = sha256Hex(assetBytes)
+                        require(remoteSha256 == sha256Hex(sourceFile.readBytes())) {
+                            "The selected GitHub Release asset does not match the local artifact"
+                        }
+
+                        ResolvedReleaseAsset(
+                            owner = source.owner,
+                            repository = source.repository,
+                            release = release,
+                            asset = asset,
+                            sha256 = remoteSha256,
+                            releaseWasCreated = null
+                        )
+                    }
+                }
 
             onProgress(PublishProgressStage.REGISTERING_MARKET)
-            // Obtain proof token from market API (attests ownership of the release)
-            val proofToken =
-                marketStatsApiService.publishProof(
-                    owner = currentUser.login,
-                    repo = forgeRepoResult.repoName,
-                    releaseTag = releaseDescriptor.tagName,
-                    assetName = uploadedAsset.name,
-                    sha256 = computedSha256
-                ).getOrElse { error ->
-                    return@withContext Result.failure(error)
-                }
-
-            // Patch the release body to include the proof marker
-            val proofBody =
-                releaseDescriptor.releaseBody + "\n\n<!-- operit-market-proof $proofToken -->"
-            githubApiService.updateRelease(
-                owner = currentUser.login,
-                repo = forgeRepoResult.repoName,
-                releaseId = release.id,
-                name = releaseDescriptor.releaseName,
-                body = proofBody,
-                draft = false,
-                prerelease = false
-            ).getOrElse { error ->
-                return@withContext Result.failure(error)
-            }
-
             val payload =
                 MarketRegistrationPayload(
                     type = descriptor.type,
@@ -187,11 +231,12 @@ class GitHubForgePublishService(
                     projectDescription = descriptor.projectDescription,
                     runtimePackageId = descriptor.runtimePackageId,
                     publisherLogin = currentUser.login,
-                    forgeRepo = forgeRepoResult.repoName,
-                    releaseTag = releaseDescriptor.tagName,
-                    assetName = uploadedAsset.name,
-                    downloadUrl = uploadedAsset.browser_download_url,
-                    sha256 = computedSha256,
+                    releaseOwner = resolvedAsset.owner,
+                    releaseRepository = resolvedAsset.repository,
+                    releaseTag = resolvedAsset.release.tag_name,
+                    assetName = resolvedAsset.asset.name,
+                    downloadUrl = resolvedAsset.asset.browser_download_url,
+                    sha256 = resolvedAsset.sha256,
                     version = descriptor.version,
                     displayName = descriptor.displayName,
                     description = descriptor.description,
@@ -208,13 +253,15 @@ class GitHubForgePublishService(
                     payload = payload,
                     existingEntryId = request.publishContext?.entryId
                 ).getOrElse { error ->
-                    rollbackFailedMarketRegistration(
-                        owner = currentUser.login,
-                        repo = forgeRepoResult.repoName,
-                        release = release,
-                        releaseWasCreated = ensuredRelease.created,
-                        uploadedAsset = uploadedAsset
-                    )
+                    resolvedAsset.releaseWasCreated?.let { releaseWasCreated ->
+                        rollbackFailedMarketRegistration(
+                            owner = resolvedAsset.owner,
+                            repo = resolvedAsset.repository,
+                            release = resolvedAsset.release,
+                            releaseWasCreated = releaseWasCreated,
+                            uploadedAsset = resolvedAsset.asset
+                        )
+                    }
                     return@withContext Result.success(
                         PublishAttemptResult.RegistrationFailed(
                             errorMessage = error.message ?: "Failed to register market entry"
@@ -226,9 +273,8 @@ class GitHubForgePublishService(
             Result.success(
                 PublishAttemptResult.Success(
                     entry = entry,
-                    forgeRepo = forgeRepoResult,
-                    release = release,
-                    asset = uploadedAsset,
+                    release = resolvedAsset.release,
+                    asset = resolvedAsset.asset,
                     payload = payload
                 )
             )
@@ -284,6 +330,27 @@ class GitHubForgePublishService(
                 existedBefore = false
             )
         }
+    }
+
+    private fun parseGitHubRepositoryUrl(repositoryUrl: String): GitHubReleaseRepository {
+        val parsed = URI(repositoryUrl.trim())
+        require(parsed.scheme.equals("https", ignoreCase = true)) {
+            "GitHub repository URL must use HTTPS"
+        }
+        require(parsed.host.equals("github.com", ignoreCase = true) || parsed.host.equals("www.github.com", ignoreCase = true)) {
+            "GitHub repository URL must point to github.com"
+        }
+        val pathParts = parsed.path.trim('/').split('/').filter(String::isNotBlank)
+        require(pathParts.size >= 2) {
+            "GitHub repository URL must include owner and repository"
+        }
+        val owner = pathParts[0]
+        val repository = pathParts[1].removeSuffix(".git")
+        val validSegment = Regex("[A-Za-z0-9_.-]+")
+        require(validSegment.matches(owner) && validSegment.matches(repository)) {
+            "GitHub repository URL contains an invalid owner or repository"
+        }
+        return GitHubReleaseRepository(owner = owner, repository = repository)
     }
 
     private suspend fun initializeForgeRepository(
@@ -399,8 +466,8 @@ class GitHubForgePublishService(
                 asset = MarketV2PublishAsset(
                     kind = "github_release_asset",
                     url = payload.downloadUrl,
-                    ghOwner = payload.publisherLogin,
-                    ghRepo = payload.forgeRepo,
+                    ghOwner = payload.releaseOwner,
+                    ghRepo = payload.releaseRepository,
                     ghReleaseTag = payload.releaseTag,
                     assetName = payload.assetName,
                     sha256 = payload.sha256

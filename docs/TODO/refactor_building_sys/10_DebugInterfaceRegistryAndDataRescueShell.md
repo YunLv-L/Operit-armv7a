@@ -18,7 +18,7 @@ last_reviewed: 2026-07-14
 
 - `ScriptExecutionReceiver` 接受代码文本、脚本文件路径和函数参数，外部 ADB 可以通过广播驱动应用执行通用脚本
 - ToolPkg 安装、包刷新和 DSL dump 分别使用独立 exported receiver，没有统一的接口描述与注册表
-- `tools/execute_js.*`、`run_sandbox_script.*` 和现有 ADB 文档依赖通用执行 receiver
+- `tools/adb/execute_js.*`、`run_sandbox_script.*` 和现有 ADB 文档依赖通用执行 receiver
 - 应用内部已经具有 `DebuggerShellExecutor`、Shell 工具和终端执行能力
 - 数据救援 UI 通过 `RawSnapshotBackupManager` 导出 `files`、external files、`shared_prefs`、`datastore` 和 `databases`
 - 数据救援路径、快照导出与 UI 状态耦合，其他内部调试入口无法复用同一组路径定义
@@ -47,7 +47,7 @@ last_reviewed: 2026-07-14
 - `app/src/main/java/com/ai/assistance/operit/ui/recovery/`
 - `app/src/main/java/com/ai/assistance/operit/util/AppLogger.kt`
 - `app/src/main/java/com/ai/assistance/operit/ui/features/toolbox/screens/logcat/`
-- `tools/execute_js.*`、`tools/run_sandbox_script.*` 及迁移后的对应脚本
+- `tools/adb/execute_js.*`、`tools/adb/run_sandbox_script.*` 及迁移后的对应脚本
 - 调试接口 schema、注册清单和接口测试
 
 本步骤不修改：

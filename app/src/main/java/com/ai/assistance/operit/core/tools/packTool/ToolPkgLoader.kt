@@ -34,12 +34,7 @@ internal object ToolPkgLoader {
                     isBuiltIn = false,
                     parseJsPackage = parseJsPackage,
                     parseMainRegistration = { mainScriptText, toolPkgId, mainScriptPath ->
-                        parseMainRegistration(
-                            mainScriptText = mainScriptText,
-                            toolPkgId = toolPkgId,
-                            mainScriptPath = mainScriptPath,
-                            jsEngine = jsEngine
-                        )
+                        parseMainRegistration(mainScriptText, toolPkgId, mainScriptPath, jsEngine)
                     },
                     reportPackageLoadError = reportPackageLoadError
                 )
@@ -58,8 +53,7 @@ internal object ToolPkgLoader {
         val manifestPreview =
             ToolPkgArchiveParser.readToolPkgManifestPreview(
                 inputStreamFactory = { context.assets.open(assetPath) }
-            )
-                ?: throw IllegalArgumentException("manifest.hjson or manifest.json not found")
+            ) ?: throw IllegalArgumentException("manifest.hjson or manifest.json not found")
         val extractedDir = prepareAssetCache(manifestPreview)
         val entryIndex = ToolPkgArchiveParser.buildDirectoryEntryIndex(extractedDir)
         val readEntryText =
@@ -81,12 +75,7 @@ internal object ToolPkgLoader {
                 isBuiltIn = true,
                 parseJsPackage = parseJsPackage,
                 parseMainRegistration = { mainScriptText, toolPkgId, mainScriptPath ->
-                    parseMainRegistration(
-                        mainScriptText = mainScriptText,
-                        toolPkgId = toolPkgId,
-                        mainScriptPath = mainScriptPath,
-                        jsEngine = jsEngine
-                    )
+                    parseMainRegistration(mainScriptText, toolPkgId, mainScriptPath, jsEngine)
                 },
                 reportPackageLoadError = reportPackageLoadError
             )

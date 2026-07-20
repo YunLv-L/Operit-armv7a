@@ -19,6 +19,7 @@ import com.ai.assistance.operit.core.tools.mcp.MCPPackage
 import com.ai.assistance.operit.core.tools.mcp.MCPServerConfig
 import com.ai.assistance.operit.core.tools.mcp.MCPToolExecutor
 import com.ai.assistance.operit.core.tools.skill.SkillManager
+import com.ai.assistance.operit.data.security.PluginDenylistRepository
 import com.ai.assistance.operit.data.preferences.SkillVisibilityPreferences
 import com.ai.assistance.operit.core.tools.system.AndroidPermissionLevel
 import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
@@ -32,7 +33,6 @@ import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceConfig
 import com.ai.assistance.operit.widget.ToolPkgDesktopWidgetHost
 import com.ai.assistance.operit.util.OperitPaths
-import com.ai.assistance.operit.util.ToolPkgProtection
 import com.ai.assistance.operit.util.ToolPkgWasmRuntime
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -40,7 +40,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.zip.ZipEntry
-import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -294,6 +293,8 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
     private var externalPackageScanCache: Map<String, ExternalPackageScanCacheEntry> = emptyMap()
 
     private val skillManager by lazy { SkillManager.getInstance(context) }
+
+    private val pluginDenylistRepository by lazy { PluginDenylistRepository(context) }
 
     private val skillVisibilityPreferences by lazy { SkillVisibilityPreferences.getInstance(context) }
 
@@ -1171,6 +1172,14 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
             append(file.length())
             append('|')
             append(file.lastModified())
+            append('|')
+            append(pluginDenylistRepository.cacheSignature())
+        }
+    }
+
+    private fun pluginDenylistRejection(file: File): String? {
+        return pluginDenylistRepository.findDeniedImport(file)?.let {
+            "This plugin file is blocked by the remote security denylist"
         }
     }
 
@@ -1211,6 +1220,21 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         val nextCache = LinkedHashMap<String, ExternalPackageScanCacheEntry>()
         val candidateResults =
             externalFiles.map { file ->
+                val rejectionMessage = pluginDenylistRejection(file)
+                if (rejectionMessage != null) {
+                    return@map PackageScanCandidateResult(
+                        phase = "external",
+                        packageLoadErrors =
+                            mapOf(
+                                file.nameWithoutExtension.ifBlank { file.name } to
+                                    formatPackageLoadError(
+                                        message = rejectionMessage,
+                                        sourcePath = file.absolutePath
+                                    )
+                            ),
+                        sourcePath = file.absolutePath
+                    )
+                }
                 val candidate =
                     PackageScanCandidate(
                         fileName = file.name,
@@ -1714,7 +1738,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         }
     ): ToolPackage? {
         try {
-            val jsContent = ToolPkgProtection.decodeUtf8(file.readBytes())
+            val jsContent = file.readText()
             return parseJsPackage(jsContent) { key, error ->
                 reportPackageLoadError(
                     key,
@@ -1746,9 +1770,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
     ): ToolPackage? {
         try {
             val assetManager = context.assets
-            val jsContent = assetManager.open(assetPath).use { input ->
-                ToolPkgProtection.decodeUtf8(input.readBytes())
-            }
+            val jsContent = assetManager.open(assetPath).use { input -> input.readBytes().toString(StandardCharsets.UTF_8) }
             return parseJsPackage(jsContent) { key, error ->
                 reportPackageLoadError(
                     key,
@@ -1915,7 +1937,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         if (resourceFile == null || !resourceFile.isFile) {
             return null
         }
-        return ToolPkgProtection.decryptIfNeeded(resourceFile.readBytes())
+        return resourceFile.readBytes()
     }
 
     internal fun exportToolPkgResource(
@@ -1940,7 +1962,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
                 false
             } else {
                 destinationFile.outputStream().use { output ->
-                    output.write(ToolPkgProtection.decryptIfNeeded(resourceFile.readBytes()))
+                    output.write(resourceFile.readBytes())
                 }
                 true
             }
@@ -1972,7 +1994,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
                         parent.mkdirs()
                     }
                     destination.outputStream().use { output ->
-                        output.write(ToolPkgProtection.decryptIfNeeded(source.readBytes()))
+                        output.write(source.readBytes())
                     }
                 }
             }
@@ -2004,7 +2026,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
                         val entryName = file.relativeTo(zipRootParent).invariantSeparatorsPath
                         val entry = ZipEntry(entryName)
                         zipOutput.putNextEntry(entry)
-                        zipOutput.write(ToolPkgProtection.decryptIfNeeded(file.readBytes()))
+                        zipOutput.write(file.readBytes())
                         zipOutput.closeEntry()
                     }
             }
@@ -2200,7 +2222,6 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
             AppLogger.e(TAG, "Failed to delete external package source: $targetCanonicalPath")
             return false
         }
-
         externalPackageScanCache =
             externalPackageScanCache.filterKeys { cachedPath ->
                 val cachedCanonicalPath =
@@ -2272,6 +2293,10 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
      * Supports legacy JS/TS/HJSON files and .toolpkg containers.
      */
     fun addPackageFileFromExternalStorage(filePath: String): String {
+        return importPackageFileFromExternalStorage(filePath)
+    }
+
+    private fun importPackageFileFromExternalStorage(filePath: String): String {
         try {
             ensureInitialized()
 
@@ -2288,6 +2313,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
             if (!isToolPkg && !isJsLike && !isHjson) {
                 return "Only .toolpkg, HJSON, JavaScript (.js) and TypeScript (.ts) package files are supported"
             }
+            pluginDenylistRejection(file)?.let { return it }
 
             if (isToolPkg) {
                 val preview = loadToolPkgFromExternalFile(file)
@@ -2317,7 +2343,6 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
                 if (!registerToolPkg(loadedFromDestination)) {
                     return "Failed to register toolpkg '$containerName' due to naming conflict"
                 }
-
                 return "Successfully imported toolpkg: $containerName\nStored at: ${destinationFile.absolutePath}"
             }
 
@@ -2433,6 +2458,8 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         if (!targetFile.name.endsWith(TOOLPKG_EXTENSION, ignoreCase = true)) {
             return "ToolPkg debug install only supports .toolpkg files: ${targetFile.absolutePath}"
         }
+
+        pluginDenylistRejection(targetFile)?.let { return it }
 
         val externalPackagesCanonicalPath =
             runCatching { externalPackagesDir.canonicalPath }.getOrElse { externalPackagesDir.absolutePath }
@@ -3523,9 +3550,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         toolPkgSubpackageByPackageName.remove(packageName)
     }
 
-    /**
-     * Finds the File object for a given package name in external storage.
-     */
+    /** Finds the File object for a given package name in external storage. */
     private fun findPackageFile(packageName: String): File? {
         val normalizedPackageName = normalizePackageName(packageName)
         val externalPackagesDir = File(context.getExternalFilesDir(null), PACKAGES_DIR)

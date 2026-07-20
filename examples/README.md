@@ -67,17 +67,17 @@
 
 Windows:
 ```
-.\tools\execute_js.bat <JS文件路径> <函数名> <JSON参数或@参数文件>
+.\tools\adb\execute_js.bat <JS文件路径> <函数名> <JSON参数或@参数文件>
 ```
 
 Linux/macOS:
 ```
-./tools/execute_js.sh <JS文件路径> <函数名> <JSON参数或@参数文件>
+./tools/adb/execute_js.sh <JS文件路径> <函数名> <JSON参数或@参数文件>
 ```
 
 例如：
 ```
-.\tools\execute_js.bat examples\demo_script.js calculate @params.json
+.\tools\adb\execute_js.bat examples\demo_script.js calculate @params.json
 ```
 
 补充说明：
