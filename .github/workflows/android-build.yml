@@ -212,6 +212,10 @@ jobs:
         env:
           GITHUB_CLIENT_ID: ${{ secrets.OPERIT_GITHUB_CLIENT_ID }}
           GITHUB_CLIENT_SECRET: ${{ secrets.OPERIT_GITHUB_CLIENT_SECRET }}
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
         shell: bash
         run: |
           set -euo pipefail
@@ -243,11 +247,6 @@ jobs:
               echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
             fi
           } > local.properties
-        env:
-          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
 
       - name: Run Gradle build
         id: gradle-build
