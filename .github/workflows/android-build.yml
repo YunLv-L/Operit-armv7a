@@ -217,12 +217,37 @@ jobs:
           set -euo pipefail
           : "${GITHUB_CLIENT_ID:?OPERIT_GITHUB_CLIENT_ID is required}"
           : "${GITHUB_CLIENT_SECRET:?OPERIT_GITHUB_CLIENT_SECRET is required}"
+
+          if [[ -n "${SIGNING_KEYSTORE_BASE64:-}" ]]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$HOME/release.keystore"
+            RELEASE_STORE_FILE="$HOME/release.keystore"
+            RELEASE_STORE_PASSWORD="${SIGNING_STORE_PASSWORD:-}"
+            RELEASE_KEY_ALIAS="${SIGNING_KEY_ALIAS:-}"
+            RELEASE_KEY_PASSWORD="${SIGNING_KEY_PASSWORD:-}"
+          else
+            RELEASE_STORE_FILE=""
+            RELEASE_STORE_PASSWORD=""
+            RELEASE_KEY_ALIAS=""
+            RELEASE_KEY_PASSWORD=""
+          fi
+
           umask 077
           {
             echo "sdk.dir=$ANDROID_HOME"
             echo "GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID"
             echo "GITHUB_CLIENT_SECRET=$GITHUB_CLIENT_SECRET"
+            if [[ -n "$RELEASE_STORE_FILE" ]]; then
+              echo "RELEASE_STORE_FILE=$RELEASE_STORE_FILE"
+              echo "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD"
+              echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
+              echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
+            fi
           } > local.properties
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
 
       - name: Run Gradle build
         id: gradle-build
