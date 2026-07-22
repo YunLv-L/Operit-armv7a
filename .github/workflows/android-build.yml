@@ -165,14 +165,14 @@ jobs:
 
           # 安装 Rust 工具链并添加两个目标平台
           rustup toolchain install 1.88.0 --profile minimal
-          rustup target add --toolchain 1.88.0 aarch64-linux-android armv7a-linux-androideabi
+          rustup target add --toolchain 1.88.0 aarch64-linux-android armv7-linux-androideabi
 
           # 1. 构建 arm64-v8a (aarch64)
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_LLVM/aarch64-linux-android26-clang"
           cargo +1.88.0 build \
             --manifest-path tools/native_ripgrep/Cargo.toml \
             --release \
-            --target aarch64-linux-android \
+            --target armv7a-linux-androideabi \
             --locked
           install -Dm755 \
             tools/native_ripgrep/target/aarch64-linux-android/release/liboperit_ripgrep.so \
