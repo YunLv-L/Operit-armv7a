@@ -172,7 +172,7 @@ jobs:
           cargo +1.88.0 build \
             --manifest-path tools/native_ripgrep/Cargo.toml \
             --release \
-            --target armv7a-linux-androideabi \
+            --target armv7-linux-androideabi \
             --locked
           install -Dm755 \
             tools/native_ripgrep/target/aarch64-linux-android/release/liboperit_ripgrep.so \
