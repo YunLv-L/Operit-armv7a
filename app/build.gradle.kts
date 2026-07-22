@@ -67,7 +67,7 @@ android {
             // Explicitly specify the ABIs we package for the app process.
             // terminal now also ships x86_64 runtime binaries for the Android Studio emulator,
             // while the rest of the app remains primarily ARM-focused.
-            abiFilters.addAll(listOf("arm64-v8a"))
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
         }
 
         externalNativeBuild {
