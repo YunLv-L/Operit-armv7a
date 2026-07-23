@@ -189,6 +189,15 @@ jobs:
           test -s app/src/main/jniLibs/arm64-v8a/liboperit_ripgrep.so
           test -s app/src/main/jniLibs/armeabi-v7a/liboperit_ripgrep.so
 
+      - name: Download prebuilt llama libraries
+        run: |
+          wget https://github.com/YunLv-L/llama-android/releases/download/v10092-android-armv7a/libs.zip
+          unzip -o libs.zip -d llama/src/main/jniLibs/
+          rm libs.zip
+          # 验证文件是否存在
+          ls -la llama/src/main/jniLibs/armeabi-v7a/
+          ls -la llama/src/main/jniLibs/arm64-v8a/
+
       - name: Install JavaScript dependencies
         shell: bash
         run: |
