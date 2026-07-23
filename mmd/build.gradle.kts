@@ -22,11 +22,13 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags += listOf("-std=c++17", "-fno-emulated-tls")
+                cppFlags += listOf("-std=c++17", "-fno-emulated-tls", "-ftls-model=local-exec")
                 arguments += listOf(
                     "-DANDROID_STL=c++_static",
                     "-DANDROID_PLATFORM=android-26",
-                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+                    "-DCMAKE_CXX_FLAGS=-ftls-model=local-exec",
+                    "-DCMAKE_C_FLAGS=-ftls-model=local-exec"
                 )
             }
         }
