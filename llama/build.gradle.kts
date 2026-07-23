@@ -24,7 +24,6 @@ android {
             cmake {
                 cppFlags += listOf(
                     "-std=c++17",
-                    "-fno-emulated-tls",
                     "-DGGML_USE_NEON=1",
                     "-DGGML_USE_ARM_NEON=1",
                     "-D__ARM_NEON=1",
