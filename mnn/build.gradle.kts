@@ -19,8 +19,7 @@ android {
         consumerProguardFiles("consumer-rules.pro")
 
         ndk {
-            // 支持的 ABI（与主 app 保持一致）
-            abiFilters.addAll(listOf("arm64-v8a"))
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
         }
 
         externalNativeBuild {
