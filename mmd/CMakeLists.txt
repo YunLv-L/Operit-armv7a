@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project("mmd_jni")
 
+# ====== 强制修复 32 位 ARM TLS 链接错误 ======
+if(ANDROID_ABI STREQUAL "armeabi-v7a")
+    # 使用本地执行 TLS 模型，避免外部 __tls_get_addr
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftls-model=local-exec")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ftls-model=local-exec")
+    # 链接时放宽未定义符号检查，但确保 TLS 相关符号被解析
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-undefined")
+endif()
+# =============================================
+
 include("${CMAKE_CURRENT_LIST_DIR}/../cmake/operit_git_source.cmake")
 
 operit_prepare_git_source(
