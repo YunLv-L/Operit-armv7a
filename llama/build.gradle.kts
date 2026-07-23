@@ -22,11 +22,9 @@ android {
 
         externalNativeBuild {
             cmake {
-                // 为 armeabi-v7a 添加 Neon 兼容和禁用 LlamaFile 的标志
                 cppFlags += listOf(
                     "-std=c++17",
                     "-fno-emulated-tls",
-                    "-mfpu=neon-vfpv4",
                     "-DGGML_USE_NEON=1",
                     "-DGGML_USE_ARM_NEON=1",
                     "-D__ARM_NEON=1",
