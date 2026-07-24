@@ -230,9 +230,9 @@ jobs:
           git diff --exit-code -- examples/github.js
           python3 tools/example_packages/sync_example_packages.py --no-hot-reload
 
-      - name: Patch terminal build.gradle for armv7a
+      - name: Patch terminal build.gradle.kts for armv7a
         run: |
-          sed -i 's/abiFilters += listOf("arm64-v8a")/abiFilters += listOf("armeabi-v7a", "arm64-v8a")/' terminal/build.gradle
+          sed -i 's/abiFilters += listOf("arm64-v8a")/abiFilters += listOf("armeabi-v7a", "arm64-v8a")/' terminal/build.gradle.kts
 
       - name: Configure Android build
         env:
