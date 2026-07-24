@@ -202,7 +202,6 @@ jobs:
           wget https://github.com/alibaba/MNN/releases/download/3.6.1/mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan.zip
           unzip -o mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan.zip -d mnn/src/main/jniLibs/
           rm mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan.zip
-          # 移动文件到正确的 jniLibs 目录结构
           if [ -d "mnn/src/main/jniLibs/mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan" ]; then
             mkdir -p mnn/src/main/jniLibs/armeabi-v7a mnn/src/main/jniLibs/arm64-v8a
             cp -r mnn/src/main/jniLibs/mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan/armeabi-v7a/* mnn/src/main/jniLibs/armeabi-v7a/ 2>/dev/null || true
@@ -230,6 +229,10 @@ jobs:
           npm run build:examples:github
           git diff --exit-code -- examples/github.js
           python3 tools/example_packages/sync_example_packages.py --no-hot-reload
+
+      - name: Patch terminal build.gradle for armv7a
+        run: |
+          sed -i 's/abiFilters += listOf("arm64-v8a")/abiFilters += listOf("armeabi-v7a", "arm64-v8a")/' terminal/build.gradle
 
       - name: Configure Android build
         env:
