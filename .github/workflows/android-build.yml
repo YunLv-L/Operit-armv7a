@@ -189,14 +189,28 @@ jobs:
           test -s app/src/main/jniLibs/arm64-v8a/liboperit_ripgrep.so
           test -s app/src/main/jniLibs/armeabi-v7a/liboperit_ripgrep.so
 
-      - name: Download prebuilt llama libraries
+      - name: Download llama prebuilt libraries
         run: |
           wget https://github.com/YunLv-L/llama-android/releases/download/v10092-android-armv7a/libs.zip
           unzip -o libs.zip -d llama/src/main/jniLibs/
           rm libs.zip
-          # 验证文件是否存在
           ls -la llama/src/main/jniLibs/armeabi-v7a/
           ls -la llama/src/main/jniLibs/arm64-v8a/
+
+      - name: Download MNN prebuilt libraries
+        run: |
+          wget https://github.com/alibaba/MNN/releases/download/3.6.1/mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan.zip
+          unzip -o mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan.zip -d mnn/src/main/jniLibs/
+          rm mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan.zip
+          # 移动文件到正确的 jniLibs 目录结构
+          if [ -d "mnn/src/main/jniLibs/mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan" ]; then
+            mkdir -p mnn/src/main/jniLibs/armeabi-v7a mnn/src/main/jniLibs/arm64-v8a
+            cp -r mnn/src/main/jniLibs/mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan/armeabi-v7a/* mnn/src/main/jniLibs/armeabi-v7a/ 2>/dev/null || true
+            cp -r mnn/src/main/jniLibs/mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan/arm64-v8a/* mnn/src/main/jniLibs/arm64-v8a/ 2>/dev/null || true
+            rm -rf mnn/src/main/jniLibs/mnn_3.6.1_android_armv7_armv8_cpu_opencl_vulkan
+          fi
+          ls -la mnn/src/main/jniLibs/armeabi-v7a/
+          ls -la mnn/src/main/jniLibs/arm64-v8a/
 
       - name: Install JavaScript dependencies
         shell: bash
