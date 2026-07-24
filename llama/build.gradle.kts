@@ -15,31 +15,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
-
-        ndk {
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
-        }
-
-        externalNativeBuild {
-            cmake {
-                cppFlags += listOf(
-                    "-std=c++17",
-                    "-DGGML_USE_NEON=1",
-                    "-DGGML_USE_ARM_NEON=1",
-                    "-D__ARM_NEON=1",
-                    "-DGGML_USE_LLAMAFILE=OFF"
-                )
-                arguments += listOf(
-                    "-DANDROID_STL=c++_static",
-                    "-DANDROID_PLATFORM=android-26",
-                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
-                    "-DLLAMA_BUILD_COMMON=ON",
-                    "-DGGML_USE_NEON=1",
-                    "-DGGML_USE_ARM_NEON=1",
-                    "-DGGML_USE_LLAMAFILE=OFF"
-                )
-            }
-        }
     }
 
     buildTypes {
@@ -48,18 +23,12 @@ android {
         }
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // 注意：删除了 ndk 块、externalNativeBuild 块和 CMake 引用
 }
 
 kotlin {
